@@ -29,6 +29,11 @@ class BuzzoController
         void Initialize();
         void Update();
 
+
+        void EndCurrentRespondantTurn(bool isCorrect);
+        void BeginIncorrectButtonPress();
+        void BeginResetButtonPress();        
+
     private:
         static BuzzoController* _instance;
 
@@ -46,11 +51,15 @@ class BuzzoController
         void SendOffCommand(IPAddress ip);
         void SendSelectCommand(IPAddress ip);
         void SendErrorCommand(IPAddress ip, int errorCode);
+
+        void UpdatePlaying();
+        void UpdateSetup();
         
         void AddClient(ButtonClientInfo* newClient);
         void RemoveClientAt(unsigned int index);
         ButtonClientInfo* GetClient(IPAddress ip);
         ButtonClientInfo* GetClient(std::string id);
+
 
         ButtonClientInfo* _clients[MAX_CLIENTS];
         unsigned int _clientCount = 0;
@@ -61,6 +70,8 @@ class BuzzoController
 
         unsigned int _lastSendTime = 0;
         unsigned int _responseStartTime = 0;
+        unsigned int _nextResponderDelayStartTime = 0;
+        unsigned int _lastRespondantPingTime = 0;
 
         ControllerState _currentState = BuzzoController::PLAYING;
 

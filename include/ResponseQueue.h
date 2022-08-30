@@ -47,7 +47,7 @@ class ResponseQueue
     {
       if(IsEmpty())
       {
-        return -1;
+        return {};
       }
 
       T response = _responses[_currentResponseIndex];
@@ -67,14 +67,14 @@ class ResponseQueue
       }
     }   
 
-    T PeekNextResponse()
+    T PeekNextResponse(int index = 0)
     {
       if(IsEmpty())
       {
-        return -1;
+        return {};
       }
 
-      return _responses[_currentResponseIndex];
+      return _responses[GET_INDEX(index)];
     }    
 
     void Clear()
