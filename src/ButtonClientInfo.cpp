@@ -1,6 +1,7 @@
 #include "ButtonClientInfo.h"
 #include <Arduino.h>
 
+#define MAX_SCORE 9
 
 ButtonClientInfo::ButtonClientInfo() :
 _ip(),
@@ -45,7 +46,7 @@ int ButtonClientInfo::GetScore()
 
 void ButtonClientInfo::SetScore(int score)
 {
-    _score = max(0, score);
+    _score = max(0, min(MAX_SCORE, score));
 }
 
 int ButtonClientInfo::IncrementScore(int add)

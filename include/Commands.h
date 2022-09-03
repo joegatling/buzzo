@@ -15,6 +15,7 @@
 #define COMMAND_OFF "OFF"
 #define COMMAND_SELECT "SEL"
 #define COMMAND_ERROR "ERR"
+#define COMMAND_SCORE "SCR"
 
 // Errors
 #define ERROR_TOO_MANY_CLIENTS 1

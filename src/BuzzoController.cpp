@@ -32,7 +32,8 @@ BuzzoController::BuzzoController():
 _correctButton(CORRECT_BUTTON_PIN),
 _incorrectButton(INCORRECT_BUTTON_PIN),
 _ResetButton(RESET_BUTTON_PIN),
-_responseQueue(MAX_CLIENTS)
+_responseQueue(MAX_CLIENTS),
+_isAcceptingResponses(true)
 {
     _currentRespondant.assign("");
     _clientCount = 0;
@@ -65,6 +66,7 @@ void BuzzoController::Update()
     }
 }
 
+#pragma region Command Processing
 void BuzzoController::ProcessPacket()
 {
     int packetSize = udp.parsePacket();
@@ -87,9 +89,6 @@ void BuzzoController::ProcessPacket()
         {
             char command[LEN_COMMAND+1];
             command[LEN_COMMAND] = 0;
-
-            // char command[LEN_COMMAND+1];
-            // command[LEN_COMMAND] = 0;            
 
             for(int i = 0; i < 3; i++)
             {
@@ -115,18 +114,19 @@ void BuzzoController::ProcessPacket()
     }
 }
 
-
-
 void BuzzoController::ProcessRegisterCommand(IPAddress ip, std::string param)
 {
     for(int i = 0; i < _clientCount; i++)
     {
         if(_clients[i]->GetId().compare(param) == 0)
         {
+            _clients[i]->ResetTimeSinceLastContact();
+
             // An entry with a different IP is associated with this ID. This
             // means the button has been assigned a new IP.
 
             _clients[i]->SetIpAddress(ip);
+            
 
             // Scan through the remaining clients and make sure any duplicate
             // entries with this IP don't exist
@@ -143,6 +143,8 @@ void BuzzoController::ProcessRegisterCommand(IPAddress ip, std::string param)
         } 
         else if(_clients[i]->GetIpAddress() == ip)
         {
+            _clients[i]->ResetTimeSinceLastContact();
+
             // If this IP is to be associated with a new ID, then this must
             // be an entirely new Button, so reset the score too.
 
@@ -185,6 +187,8 @@ void BuzzoController::ProcessBuzzCommand(IPAddress ip)
 
     if(client != 0)
     {
+        client->ResetTimeSinceLastContact();
+
         if(!_responseQueue.ContainsResponse(client->GetId()))
         {
             _responseQueue.EnqueueResponse(client->GetId());
@@ -196,9 +200,13 @@ void BuzzoController::ProcessBuzzCommand(IPAddress ip)
         {
             SendQueueCommand(ip, _responseQueue.GetResponseCount());
         }
+
+        // Note: A respondant will be selected in the next update, so all we need to here is enqueue
     }
 }
+#pragma endregion
 
+#pragma region Command Functions
 void BuzzoController::SendAnswerCommand(IPAddress ip, int timer)
 {
     udp.beginPacket(ip, PORT);
@@ -224,10 +232,12 @@ void BuzzoController::SendResponseCommand(IPAddress ip, bool isCorrect)
     udp.endPacket();
 }
 
-void BuzzoController::SendResetCommand(IPAddress ip)
+void BuzzoController::SendResetCommand(IPAddress ip, bool canBuzz)
 {
     udp.beginPacket(ip, PORT);
     udp.println(COMMAND_RESET);
+    udp.print(" ");
+    udp.println(canBuzz);    
     udp.endPacket();
 }
 
@@ -254,6 +264,17 @@ void BuzzoController::SendErrorCommand(IPAddress ip, int errorCode)
     udp.endPacket();
 }
 
+void BuzzoController::SendScoreCommand(IPAddress ip, int score = 0)
+{
+    udp.beginPacket(ip, PORT);
+    udp.println(COMMAND_SCORE);
+    udp.print(" ");
+    udp.println(score);    
+    udp.endPacket();
+}
+#pragma endregion
+
+#pragma region Update Functions
 void BuzzoController::UpdatePlaying()
 {
     if(_currentRespondant.length() > 0)
@@ -286,7 +307,7 @@ void BuzzoController::UpdatePlaying()
             _nextResponderDelayStartTime = millis();
         }
     }
-    else if(_currentRespondant.length() == 0 && !_responseQueue.IsEmpty())
+    else if(_currentRespondant.length() == 0 && !_responseQueue.IsEmpty() && _isAcceptingResponses == true)
     {
         // Wait a short delay between respondants to increase gameplay tension
         if(millis() - _nextResponderDelayStartTime > TIME_BETWEEN_RESPONDERS)
@@ -321,7 +342,9 @@ void BuzzoController::UpdatePlaying()
 
 void BuzzoController::UpdateSetup()
 {}
+#pragma endregion
 
+#pragma region Client Management Functions
 void BuzzoController::AddClient(ButtonClientInfo* newClient)
 {
     if(_clientCount < MAX_CLIENTS)
@@ -368,7 +391,9 @@ ButtonClientInfo* BuzzoController::GetClient(std::string id)
 
     return 0;
 }
+#pragma endregion
 
+#pragma region Button Functions
 void BuzzoController::EndCurrentRespondantTurn(bool isCorrect)
 {
     if(_currentState == BuzzoController::PLAYING)
@@ -378,13 +403,32 @@ void BuzzoController::EndCurrentRespondantTurn(bool isCorrect)
             auto client = GetClient(_currentRespondant);
 
             if(client != 0)
-            {                
+            {        
+                if(isCorrect)
+                {
+                    client->SetScore(client->GetScore() + 1);
+                    _isAcceptingResponses = false; // The round is over
+                }
+
+                SendScoreCommand(client->GetIpAddress(), client->GetScore());
                 SendResponseCommand(client->GetIpAddress(), isCorrect);
             }
 
             _currentRespondant.assign("");
 
-            if(!isCorrect)
+            if(isCorrect)
+            {
+                _isAcceptingResponses = false;
+
+                for(int i = 0; i < _clientCount; i++)
+                {
+                    if(_clients[i] != client)
+                    {
+                        SendResetCommand(_clients[i]->GetIpAddress(), false);
+                    }
+                }
+            }
+            else
             {
                 _nextResponderDelayStartTime = millis();
             }
@@ -398,9 +442,33 @@ void BuzzoController::BeginResetButtonPress()
     {
         for(int i = 0; i < _clientCount; i++)
         {
-            SendResetCommand(_clients[i]->GetIpAddress());
+            SendResetCommand(_clients[i]->GetIpAddress(), true);
+
         }
 
         _currentRespondant.assign("");
+
+        _isAcceptingResponses = true;
+        _nextResponderDelayStartTime = 0;
     }    
 }
+
+void BuzzoController::HoldResetButton()
+{
+    if(_currentState == BuzzoController::PLAYING)
+    {
+        for(int i = 0; i < _clientCount; i++)
+        {
+            _clients[i]->SetScore(0);
+            
+            SendResetCommand(_clients[i]->GetIpAddress(), true);
+            SendScoreCommand(_clients[i]->GetIpAddress(), _clients[i]->GetScore());
+        }
+
+        _currentRespondant.assign("");
+
+        _isAcceptingResponses = true;
+        _nextResponderDelayStartTime = 0;
+    }    
+}
+#pragma endregion

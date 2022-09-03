@@ -32,7 +32,8 @@ class BuzzoController
 
         void EndCurrentRespondantTurn(bool isCorrect);
         void BeginIncorrectButtonPress();
-        void BeginResetButtonPress();        
+        void BeginResetButtonPress();      
+        void HoldResetButton();  
 
     private:
         static BuzzoController* _instance;
@@ -47,10 +48,11 @@ class BuzzoController
         void SendAnswerCommand(IPAddress ip, int timer);
         void SendQueueCommand(IPAddress ip, int placeInQueue);
         void SendResponseCommand(IPAddress ip, bool isCorrect);
-        void SendResetCommand(IPAddress ip);
+        void SendResetCommand(IPAddress ip, bool canBuzz);
         void SendOffCommand(IPAddress ip);
         void SendSelectCommand(IPAddress ip);
         void SendErrorCommand(IPAddress ip, int errorCode);
+        void SendScoreCommand(IPAddress ip, int score);
 
         void UpdatePlaying();
         void UpdateSetup();
@@ -72,6 +74,8 @@ class BuzzoController
         unsigned int _responseStartTime = 0;
         unsigned int _nextResponderDelayStartTime = 0;
         unsigned int _lastRespondantPingTime = 0;
+
+        bool _isAcceptingResponses = true;
 
         ControllerState _currentState = BuzzoController::PLAYING;
 
