@@ -1,5 +1,6 @@
 #include <Arduino.h>
 #include <Wifi.h>
+#include <Adafruit_NeoPixel.h>
 
 #if BUZZO_CONTROLLER
 
@@ -18,8 +19,6 @@
 const char* ssid     = "Trivia Computer Access Point";
 const char* password = "123456789";
 
-
-
 #if BUZZO_CONTROLLER
   #define LED_PIN LED_BUILTIN
 #else
@@ -27,13 +26,29 @@ const char* password = "123456789";
 #endif
 
 
+#define RANGE_START 39
+#define RANGE_END 40
+
+
+
 // Forward function declarations
 void processPacket();
 
+#if BUTTON_TEST
+
+#include "SimpleButton.h"
+
+SimpleButton testButton(32);
+
+#endif
+
+void Button()
+{
+  Serial.println("Button");
+}
+
 void setup() 
 {
-  pinMode(LED_PIN, OUTPUT);
-
   Serial.begin(115200);
   Serial.println();
 
@@ -50,11 +65,11 @@ void setup()
 
     BuzzoController::GetInstance()->Initialize();
 
-  #else
+  #elif BUZZO_BUTTON
 
     Serial.print("Connecting to wifi... ");
     WiFi.mode(WIFI_STA);
-    Serial.println(WiFi.begin(ssid, password));
+    WiFi.begin(ssid, password);
 
     auto flash = LOW;
     
@@ -71,9 +86,14 @@ void setup()
     Serial.println(WiFi.localIP());  
 
     BuzzoButton::GetInstance()->Initialize();
+    BuzzoButton::GetInstance()->SetState(BuzzoButton::IDLE);
+
+  #elif BUTTON_TEST
+
+  testButton.SetBeginPressCallback(Button);
 
   #endif
-  
+
 }
 
 #if BUZZO_CONTROLLER
@@ -83,11 +103,18 @@ void loop()
   BuzzoController::GetInstance()->Update(); 
 }
 
-#else
+#elif BUZZO_BUTTON
 
 void loop() 
 {
   BuzzoButton::GetInstance()->Update(); 
+}
+
+#elif BUTTON_TEST
+
+void loop() 
+{
+  testButton.Update();
 }
 
 #endif

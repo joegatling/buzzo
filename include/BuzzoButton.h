@@ -1,11 +1,21 @@
 #pragma once
 
 #include <WiFiudp.h>
+#include <Adafruit_NeoPixel.h>
+
 #include "BuzzoButtonState.h"
+#include "SimpleButton.h"
 
 #define PACKET_MAX_SIZE 1024
 #define PING_INTERVAL 20000
 #define PORT 8888
+
+#define NUM_LED 6
+
+#define BUZZER_BUTTON_PIN 32
+#define NEOPIXEL_PIN 14
+
+#define UNIQUE_ID_LEN 32
 
 class BuzzoButtonState;
 
@@ -14,14 +24,14 @@ class BuzzoButton
     public:
         enum StateId
         {
-            UNSET = -1,
             NONE = 0,
             IDLE, 
             ANSWERING,
             CORRECT,
             INCORRECT,
             QUEUED,
-            STATE_COUNT = QUEUED
+            DISCONNECTED,
+            STATE_COUNT
         };
 
         static BuzzoButton* GetInstance();
@@ -45,12 +55,12 @@ class BuzzoButton
         void ProcessQueueCommand(int placeInQueue);
         void ProcessCorrectResponseCommand();
         void ProcessIncorrectResponseCommand();
-        void ProcessResetcCommand(bool canBuzz);
+        void ProcessResetCommand(bool canBuzz);
         void ProcessOffCommand();
         void ProcessSelectCommand();
         void ProcessScoreCommand(int score);
 
-        void SendRegisterCommand(std::string param);
+        void SendRegisterCommand(char* param);
         void SendBuzzCommand();
 
         friend void IdleEnter(BuzzoButton* button);
@@ -73,6 +83,12 @@ class BuzzoButton
         friend void QueuedUpdate(BuzzoButton* button);
         friend void QueuedExit(BuzzoButton* button);
 
+        friend void DisconnectedEnter(BuzzoButton* button);
+        friend void DisconnectedUpdate(BuzzoButton* button);
+        friend void DisconnectedExit(BuzzoButton* button);        
+
+        friend void OnButtonPress(BuzzoButton* button);
+
         char packetBuffer[PACKET_MAX_SIZE + 1]; 
 
         WiFiUDP udp;
@@ -80,14 +96,22 @@ class BuzzoButton
         IPAddress _controllerIp;
 
         BuzzoButtonState* _states[STATE_COUNT];
-        StateId _currentState = NONE;
-        StateId _nextState = UNSET;
 
-        std::string _uniqueId;
+        StateId _currentState;
+        StateId _nextState;
+
+        SimpleButton _button;
+
+        char _uniqueId[UNIQUE_ID_LEN];
 
         int _currentScore;
         int _answeringTimeRemaining;
         int _placeInQueue;
 
+        unsigned long _lastButtonPressTime;
+
         bool _canBuzz;
+
+        Adafruit_NeoPixel _strip;
+
 };

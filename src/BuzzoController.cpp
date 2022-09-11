@@ -42,10 +42,11 @@ _isAcceptingResponses(true)
 
 void BuzzoController::Initialize()
 {
+    Serial.println("Init Start");
     _correctButton.SetBeginPressCallback([](){ BuzzoController::GetInstance()->EndCurrentRespondantTurn(true); });
     _incorrectButton.SetBeginPressCallback([](){ BuzzoController::GetInstance()->EndCurrentRespondantTurn(false); });
-
     _ResetButton.SetBeginPressCallback([](){ BuzzoController::GetInstance()->BeginResetButtonPress(); });
+    Serial.println("Init End");
 }
 
 void BuzzoController::Update()

@@ -9,15 +9,32 @@
 
 void IdleEnter(BuzzoButton* button)
 {
+    // REMOVE THIS LATER
+    button->_canBuzz = true;
+
     //TODO: Turn off the lights
     //TODO: Show current score
 
-    button->_canBuzz = true;
+    button->_strip.setBrightness(50);
+    button->_strip.clear();
+
+    button->_lastButtonPressTime = 0;
 }
 
 void IdleUpdate(BuzzoButton* button)
 {
-
+    if(button->_lastButtonPressTime > 0 && millis() - button->_lastButtonPressTime < 200)
+    {
+        button->_strip.setBrightness(255);
+        button->_strip.fill(button->_strip.Color(255,255,255));
+        button->_strip.show();
+    }
+    else
+    {
+        uint16_t hue = (millis() * 20) % 0xFFFF;
+        button->_strip.rainbow(hue,1,255,64);
+        button->_strip.show();
+    }
 }
 
 void IdleExit(BuzzoButton* button)
@@ -74,7 +91,32 @@ void QueuedExit(BuzzoButton* button)
     button->_placeInQueue = -1;
 }
 
+void DisconnectedEnter(BuzzoButton* button)
+{}
+
+void DisconnectedUpdate(BuzzoButton* button)
+{
+
+}
+
+void DisconnectedExit(BuzzoButton* button)
+{
+    button->_strip.clear();
+    button->_strip.show();
+}
+
+
 #pragma endregion
+
+
+void OnButtonPress(BuzzoButton* button)
+{
+    Serial.println("Buzz");
+    if(button->_canBuzz)
+    {
+        button->SendBuzzCommand();
+    }
+}
 
 inline std::string trim(const std::string &s)
 {
@@ -97,14 +139,17 @@ BuzzoButton* BuzzoButton::GetInstance()
 BuzzoButton::BuzzoButton() :
 _controllerIp(192,168,1,1),
 _currentScore(0),
-_canBuzz(false)
+_canBuzz(false),
+_button(BUZZER_BUTTON_PIN),
+_strip(6, NEOPIXEL_PIN, NEO_GRB + NEO_KHZ800),
+_lastButtonPressTime(0),
+_currentState(BuzzoButton::NONE),
+_nextState(BuzzoButton::NONE)
 {
-    udp.begin(PORT);
-    _uniqueId.assign(WiFi.macAddress().c_str());
-}
+    _strip.begin();
+    _strip.setBrightness(50);
+    _strip.show(); // Initialize all pixels to 'off'
 
-void BuzzoButton::Initialize()
-{
     for(int i = 0; i < STATE_COUNT; i++)
     {
         _states[i] = 0;
@@ -115,18 +160,49 @@ void BuzzoButton::Initialize()
     _states[CORRECT] = new BuzzoButtonState(&CorrectEnter, &CorrectUpdate, &CorrectExit);
     _states[INCORRECT] = new BuzzoButtonState(&IncorrectEnter, &IncorrectUpdate, &IncorrectExit);
     _states[QUEUED] = new BuzzoButtonState(&QueuedEnter, &QueuedUpdate, &QueuedExit);
+    _states[DISCONNECTED] = new BuzzoButtonState(&DisconnectedEnter, &DisconnectedUpdate, &DisconnectedExit);
+
+    _button.SetBeginPressCallback([]() { OnButtonPress(BuzzoButton::GetInstance()); });    
+
+    udp.begin(PORT);
+
+    memset(_uniqueId, '\0', sizeof(_uniqueId));
+    strcpy(_uniqueId, WiFi.macAddress().c_str());
+    Serial.print("Unique ID: ");
+    Serial.println(_uniqueId);
 }
+
+void BuzzoButton::Initialize()
+{}
 
 void BuzzoButton::Update()
 {
-    if(_nextState != BuzzoButton::UNSET)
+    _button.Update();
+    
+    if(_nextState != _currentState)
     {
-        _states[_currentState]->Exit(this);
+
+        if(_states[_currentState] != 0)
+        {
+            _states[_currentState]->Exit(this);
+        }
+        
         _currentState = _nextState;
-        _states[_currentState]->Enter(this);
+
+        if(_states[_currentState] != 0)
+        {
+            _states[_currentState]->Enter(this);
+        }
+
+        
     }
 
-    _states[_currentState]->Update(this);
+    if(_states[_currentState] != 0)
+    {
+        _states[_currentState]->Update(this);
+    }
+
+    //Serial.println("State Update End");
     
     ProcessPacket();
 
@@ -208,7 +284,7 @@ void BuzzoButton::ProcessPacket()
             {
                 if(param.length() > 0)
                 {
-                    ProcessResetcCommand((bool)atoi(param.c_str()));
+                    ProcessResetCommand((bool)atoi(param.c_str()));
                 }                
             }
             else if(strcmp(command, COMMAND_OFF) == 0)
@@ -257,7 +333,7 @@ void BuzzoButton::ProcessIncorrectResponseCommand()
     SetState(BuzzoButton::INCORRECT);
 }
 
-void BuzzoButton::ProcessResetcCommand(bool canBuzz)
+void BuzzoButton::ProcessResetCommand(bool canBuzz)
 {
     SetState(BuzzoButton::IDLE);
     _canBuzz = canBuzz;
@@ -279,19 +355,22 @@ void BuzzoButton::ProcessScoreCommand(int score)
 }
 
 
-void BuzzoButton::SendRegisterCommand(std::string param)
+void BuzzoButton::SendRegisterCommand(char* param)
 {
     udp.beginPacket(_controllerIp, PORT);
-    udp.print(COMMAND_ANSWER);
+    udp.print(COMMAND_REGISTER);
     udp.print(" ");
-    udp.println(param.c_str());
+    udp.println(param);
     udp.endPacket();
+
+    
 }
 
 void BuzzoButton::SendBuzzCommand()
 {
+    _lastButtonPressTime = millis();
+
     udp.beginPacket(_controllerIp, PORT);
     udp.print(COMMAND_BUZZ);
     udp.endPacket();
 }
-

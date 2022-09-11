@@ -12,9 +12,9 @@
 
 #define PORT 8888
 
-#define CORRECT_BUTTON_PIN 10
-#define INCORRECT_BUTTON_PIN 11
-#define RESET_BUTTON_PIN 12
+#define CORRECT_BUTTON_PIN 14
+#define INCORRECT_BUTTON_PIN 32
+#define RESET_BUTTON_PIN 15
 
 class BuzzoController
 {

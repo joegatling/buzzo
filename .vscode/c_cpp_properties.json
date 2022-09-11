@@ -10,6 +10,7 @@
             "includePath": [
                 "/Users/joegatling/Documents/git/buzzo/include",
                 "/Users/joegatling/Documents/git/buzzo/src",
+                "/Users/joegatling/Documents/git/buzzo/.pio/libdeps/buzzo_button/Adafruit NeoPixel",
                 "/Users/joegatling/.platformio/packages/framework-arduinoespressif32/libraries/WiFi/src",
                 "/Users/joegatling/.platformio/packages/framework-arduinoespressif32/tools/sdk/esp32/include/newlib/platform_include",
                 "/Users/joegatling/.platformio/packages/framework-arduinoespressif32/tools/sdk/esp32/include/freertos/include",
@@ -199,6 +200,7 @@
                 "/Users/joegatling/.platformio/packages/framework-arduinoespressif32/tools/sdk/esp32/dio_qspi/include",
                 "/Users/joegatling/.platformio/packages/framework-arduinoespressif32/cores/esp32",
                 "/Users/joegatling/.platformio/packages/framework-arduinoespressif32/variants/uPesy_esp32_wroom_devkit",
+                "/Users/joegatling/Documents/git/buzzo/.pio/libdeps/buzzo_button/Unity/src",
                 "/Users/joegatling/.platformio/packages/framework-arduinoespressif32/libraries/ArduinoOTA/src",
                 "/Users/joegatling/.platformio/packages/framework-arduinoespressif32/libraries/AsyncUDP/src",
                 "/Users/joegatling/.platformio/packages/framework-arduinoespressif32/libraries/BLE/src",
@@ -237,6 +239,7 @@
                 "path": [
                     "/Users/joegatling/Documents/git/buzzo/include",
                     "/Users/joegatling/Documents/git/buzzo/src",
+                    "/Users/joegatling/Documents/git/buzzo/.pio/libdeps/buzzo_button/Adafruit NeoPixel",
                     "/Users/joegatling/.platformio/packages/framework-arduinoespressif32/libraries/WiFi/src",
                     "/Users/joegatling/.platformio/packages/framework-arduinoespressif32/tools/sdk/esp32/include/newlib/platform_include",
                     "/Users/joegatling/.platformio/packages/framework-arduinoespressif32/tools/sdk/esp32/include/freertos/include",
@@ -426,6 +429,7 @@
                     "/Users/joegatling/.platformio/packages/framework-arduinoespressif32/tools/sdk/esp32/dio_qspi/include",
                     "/Users/joegatling/.platformio/packages/framework-arduinoespressif32/cores/esp32",
                     "/Users/joegatling/.platformio/packages/framework-arduinoespressif32/variants/uPesy_esp32_wroom_devkit",
+                    "/Users/joegatling/Documents/git/buzzo/.pio/libdeps/buzzo_button/Unity/src",
                     "/Users/joegatling/.platformio/packages/framework-arduinoespressif32/libraries/ArduinoOTA/src",
                     "/Users/joegatling/.platformio/packages/framework-arduinoespressif32/libraries/AsyncUDP/src",
                     "/Users/joegatling/.platformio/packages/framework-arduinoespressif32/libraries/BLE/src",
@@ -463,7 +467,7 @@
             "defines": [
                 "PLATFORMIO=60105",
                 "ARDUINO_uPesy_WROOM",
-                "BUZZO_CONTROLLER",
+                "BUZZO_BUTTON",
                 "HAVE_CONFIG_H",
                 "MBEDTLS_CONFIG_FILE=\"mbedtls/esp_config.h\"",
                 "UNITY_INCLUDE_CONFIG_H",
