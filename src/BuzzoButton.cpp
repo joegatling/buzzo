@@ -81,7 +81,37 @@ void AnsweringEnter(BuzzoButton* button)
 {}
 
 void AnsweringUpdate(BuzzoButton* button)
-{}
+{
+    float timeLeft = (millis() - button->_stateEnterTime) / 30000.0f;
+    uint8_t debugTimer = max(0.0f, 255 - (timeLeft * 255));
+    float step = 255 / (float)button->_strip.numPixels();    
+
+    Serial.println(debugTimer);
+
+    button->_strip.setBrightness(255);
+
+    const float pulseAmount = 64;
+    float pulse = 255 - pulseAmount + sin(millis() / 100.0f) * pulseAmount;
+
+    for(int i = 0; i < button->_strip.numPixels(); i++)
+    {
+        if(i < ceil(debugTimer / step))
+        {
+            button->_strip.setPixelColor(i, pulse, pulse, 0);
+        }
+        else
+        {
+            button->_strip.setPixelColor(i, 4, 4, 0);
+        }
+    }
+
+    // if(debugTimer == 0)
+    // {
+    //     button->SetState(BuzzoButton::INCORRECT);
+    // }
+
+    button->_strip.show();
+}
 
 void AnsweringExit(BuzzoButton* button)
 {}
@@ -199,19 +229,20 @@ void IncorrectExit(BuzzoButton* button)
 void QueuedEnter(BuzzoButton* button)
 {
     button->_strip.setBrightness(255);
+    button->_placeInQueue = 1;
 }
 
 void QueuedUpdate(BuzzoButton* button)
 {
-    float offset = millis() / 800.0f;
+    float offset = millis() / 2000.0f;
     offset = ((sin((offset + 0.5f)* TWO_PI) + (offset + 0.5f) * TWO_PI) / TWO_PI) - 0.5f;
 
     int count = button->_strip.numPixels();
 
-    uint16_t colorA = 5000;
-    uint16_t colorB = 3000;
+    uint16_t colorA = 40000;
+    uint16_t colorB = 45000;
 
-    uint8_t patterns[3] = { 0b0000001, 0b00001001, 0b00010101 };
+    uint8_t patterns[3] = { 0b0000001, 0b00001001, 0b00000000 };
 
     int patternIndex = constrain(button->_placeInQueue - 1, 0, sizeof(patterns) - 1);
     
@@ -240,7 +271,7 @@ void QueuedUpdate(BuzzoButton* button)
 
         uint16_t hue = mapf(f, 0.0f, 1.0f, colorB, colorA);
         uint8_t sat = 255;
-        uint8_t val = (uint8_t)mapf(f, 0.0f, 1.0f, 0.0f, 80.0f);
+        uint8_t val = (uint8_t)mapf(f, 0.0f, 1.0f, 1.0f, 20.0f);
 
         auto color = button->_strip.ColorHSV(hue,sat,val);
         button->_strip.setPixelColor(i, color);
