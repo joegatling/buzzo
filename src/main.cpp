@@ -86,7 +86,7 @@ void setup()
     Serial.println(WiFi.localIP());  
 
     BuzzoButton::GetInstance()->Initialize();
-    BuzzoButton::GetInstance()->SetState(BuzzoButton::IDLE);
+    BuzzoButton::GetInstance()->SetState(BuzzoButton::CORRECT);
 
   #elif BUTTON_TEST
 

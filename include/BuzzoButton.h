@@ -108,6 +108,10 @@ class BuzzoButton
         int _answeringTimeRemaining;
         int _placeInQueue;
 
+        bool _isShowingScore;
+
+        unsigned long _stateEnterTime;
+
         unsigned long _lastButtonPressTime;
 
         bool _canBuzz;
