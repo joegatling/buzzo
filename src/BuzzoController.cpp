@@ -1,4 +1,5 @@
 #include <string>
+#include <Arduino.h>
 
 #include "BuzzoController.h"
 #include "Commands.h"
@@ -42,11 +43,12 @@ _isAcceptingResponses(true)
 
 void BuzzoController::Initialize()
 {
-    Serial.println("Init Start");
-    _correctButton.SetBeginPressCallback([](){ BuzzoController::GetInstance()->EndCurrentRespondantTurn(true); });
-    _incorrectButton.SetBeginPressCallback([](){ BuzzoController::GetInstance()->EndCurrentRespondantTurn(false); });
-    _ResetButton.SetBeginPressCallback([](){ BuzzoController::GetInstance()->BeginResetButtonPress(); });
-    Serial.println("Init End");
+    _correctButton.SetEndPressCallback([](){ BuzzoController::GetInstance()->EndCurrentRespondantTurn(true); });
+    
+    _incorrectButton.SetEndPressCallback([](){ BuzzoController::GetInstance()->EndCurrentRespondantTurn(false); });
+    
+    _ResetButton.SetEndPressCallback([](){ BuzzoController::GetInstance()->BeginResetButtonPress(); });
+    _ResetButton.SetHoldCallback([](){ BuzzoController::GetInstance()->HoldResetButton(); });
 }
 
 void BuzzoController::Update()
@@ -125,9 +127,7 @@ void BuzzoController::ProcessRegisterCommand(IPAddress ip, std::string param)
 
             // An entry with a different IP is associated with this ID. This
             // means the button has been assigned a new IP.
-
-            _clients[i]->SetIpAddress(ip);
-            
+            _clients[i]->SetIpAddress(ip);            
 
             // Scan through the remaining clients and make sure any duplicate
             // entries with this IP don't exist
@@ -280,6 +280,8 @@ void BuzzoController::UpdatePlaying()
 {
     if(_currentRespondant.length() > 0)
     {
+        unsigned long timeResponding = millis() - _responseStartTime;
+
         // Update respondant timer
         if(millis() - _lastRespondantPingTime > RESPONDANT_PING_TIME)
         {
@@ -287,15 +289,15 @@ void BuzzoController::UpdatePlaying()
 
             if(client != 0)
             {
-                unsigned int timeRemaining = ((millis() - _responseStartTime) * CLIENT_TIMER_MAX) / RESPONSE_TIME_LIMIT;
-                SendAnswerCommand(client->GetIpAddress(), timeRemaining);
+                float timeRemaining = timeResponding / RESPONSE_TIME_LIMIT;
+                SendAnswerCommand(client->GetIpAddress(), max(0, (int)(1.0f - timeRemaining) * 255));
             }
 
             _lastRespondantPingTime = millis();
         }
 
         // Responder ran out of time
-        if(millis() - _responseStartTime > RESPONSE_TIME_LIMIT)
+        if(timeResponding > RESPONSE_TIME_LIMIT)
         {
             auto client = GetClient(_currentRespondant);
 

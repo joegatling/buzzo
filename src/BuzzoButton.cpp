@@ -293,7 +293,12 @@ void DisconnectedEnter(BuzzoButton* button)
 
 void DisconnectedUpdate(BuzzoButton* button)
 {
-
+    for(int i = 0; i < button->_strip.numPixels(); i++)
+    {
+        bool isOn = ((millis() / 200) % button->_strip.numPixels()) == i;
+        button->_strip.setPixelColor(i, isOn ? button->_strip.Color(64,64,64) : button->_strip.Color(0,0,0));
+    }    
+    button->_strip.show();
 }
 
 void DisconnectedExit(BuzzoButton* button)
@@ -402,14 +407,16 @@ void BuzzoButton::Update()
     }
 
     //Serial.println("State Update End");
-    
-    ProcessPacket();
-
-    // Periodically send a register command
-    if(millis() - _lastSendTime > PING_INTERVAL || _lastSendTime == 0) 
+    if(_currentState != BuzzoButton::DISCONNECTED)
     {
-        SendRegisterCommand(_uniqueId);
-        _lastSendTime = millis();
+        ProcessPacket();
+
+        // Periodically send a register command
+        if(millis() - _lastSendTime > PING_INTERVAL || _lastSendTime == 0) 
+        {
+            SendRegisterCommand(_uniqueId);
+            _lastSendTime = millis();
+        }
     }
 }
 

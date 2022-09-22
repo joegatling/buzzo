@@ -29,6 +29,9 @@ const char* password = "123456789";
 #define RANGE_START 39
 #define RANGE_END 40
 
+bool isConnected = false;
+unsigned long lastConnectionCheckTime = 0;
+
 
 
 // Forward function declarations
@@ -71,16 +74,19 @@ void setup()
     WiFi.mode(WIFI_STA);
     WiFi.begin(ssid, password);
 
-    auto flash = LOW;
+    //auto flash = LOW;
+    isConnected = false;
     
-    while (WiFi.status() != WL_CONNECTED) 
-    {
-      digitalWrite(LED_PIN, flash);
-      flash = flash == LOW ? HIGH : LOW;
-      Serial.print('.');
-      delay(200);
-    }
+    // while (WiFi.status() != WL_CONNECTED) 
+    // {
+    //   digitalWrite(LED_PIN, flash);
+    //   flash = flash == LOW ? HIGH : LOW;
+    //   Serial.print('.');
+    //   delay(200);
+    // }
 
+    // WiFi.setAutoReconnect(true);
+    
     digitalWrite(LED_PIN, HIGH);
 
     Serial.println(WiFi.localIP());  
@@ -106,7 +112,26 @@ void loop()
 #elif BUZZO_BUTTON
 
 void loop() 
-{
+{  
+  if(WiFi.status() != WL_CONNECTED)
+  {
+    if(isConnected == true)
+    {
+      isConnected = false;
+      BuzzoButton::GetInstance()->SetState(BuzzoButton::DISCONNECTED);
+    }
+  }
+  else
+  {
+    if(isConnected == false)
+    {
+      isConnected = true;
+      WiFi.setAutoReconnect(true);
+
+      BuzzoButton::GetInstance()->SetState(BuzzoButton::IDLE);
+    }
+  }
+  
   BuzzoButton::GetInstance()->Update(); 
 }
 
