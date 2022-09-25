@@ -45,7 +45,7 @@ class BuzzoController
         void ProcessRegisterCommand(IPAddress ip, std::string param);
         void ProcessBuzzCommand(IPAddress ip);
 
-        void SendAnswerCommand(IPAddress ip, int timer);
+        void SendAnswerCommand(IPAddress ip, int timer, int totalTime);
         void SendQueueCommand(IPAddress ip, int placeInQueue);
         void SendResponseCommand(IPAddress ip, bool isCorrect);
         void SendResetCommand(IPAddress ip, bool canBuzz);

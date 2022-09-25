@@ -1,6 +1,11 @@
 
 #include <Wifi.h>
 #include <Arduino.h>
+#include <iostream>
+#include <vector>
+#include <string>
+#include <sstream>
+#include <iterator>
 
 #include "BuzzoButton.h"
 #include "Commands.h"
@@ -82,12 +87,6 @@ void AnsweringEnter(BuzzoButton* button)
 
 void AnsweringUpdate(BuzzoButton* button)
 {
-    float timeLeft = (millis() - button->_stateEnterTime) / 30000.0f;
-    uint8_t debugTimer = max(0.0f, 255 - (timeLeft * 255));
-    float step = 255 / (float)button->_strip.numPixels();    
-
-    Serial.println(debugTimer);
-
     button->_strip.setBrightness(255);
 
     const float pulseAmount = 64;
@@ -95,21 +94,16 @@ void AnsweringUpdate(BuzzoButton* button)
 
     for(int i = 0; i < button->_strip.numPixels(); i++)
     {
-        if(i < ceil(debugTimer / step))
+        if(i < ceil(button->_answeringTimeRemaining / button->_answeringTotalTime))
         {
             button->_strip.setPixelColor(i, pulse, pulse, 0);
         }
         else
         {
-            button->_strip.setPixelColor(i, 4, 4, 0);
+            button->_strip.setPixelColor(i, 8, 8, 0);
         }
     }
-
-    // if(debugTimer == 0)
-    // {
-    //     button->SetState(BuzzoButton::INCORRECT);
-    // }
-
+    
     button->_strip.show();
 }
 
@@ -438,69 +432,120 @@ void BuzzoButton::ProcessPacket()
         Serial.println("Contents:");
         Serial.println(packetBuffer); 
 
-        if(packetSize >= 3)
+        std::stringstream data(packetBuffer);
+        std::string command;
+
+        data >> command;
+
+        bool error = false;
+
+        if(command.length() == 3)
         {
-            char command[LEN_COMMAND+1];
-            command[LEN_COMMAND] = 0;
+            std::string params[2];
+            int paramCount = 0;
 
-            for(int i = 0; i < 3; i++)
+            while(data || paramCount >= sizeof(params))
             {
-                command[i] = packetBuffer[i];
+                data >> params[paramCount++];
             }
+            // char command[LEN_COMMAND+1];
+            // command[LEN_COMMAND] = 0;
 
-            std::string param;
+            // for(int i = 0; i < 3; i++)
+            // {
+            //     command[i] = packetBuffer[i];
+            // }
 
-            if(packetSize > 3)
-            {
-                param.assign(command+3);
-                param = trim(param);
-            }            
+            //std::string param;
+
+            // if(packetSize > 3)
+            // {
+            //     param.assign(command+3);
+            //     param = trim(param);
+            // }            
 
             // Process Packet
-            if(strcmp(command, COMMAND_ANSWER) == 0)
-            {
-                if(param.length() > 0)
+            
+            if(command.compare(COMMAND_ANSWER) == 0)
+            {            
+                if(paramCount == 2)
                 {
-                    ProcessAnswerCommand(atoi(param.c_str()));
+                    int timeLeft = atoi(params[0].c_str());
+                    int totalTime = atoi(params[1].c_str());
+
+                    // Some basic sanity checks
+                    if(totalTime > 0 && timeLeft <= totalTime)
+                    {
+                        ProcessAnswerCommand(timeLeft, totalTime);
+                    }
+                    else
+                    {
+                        error = true;
+                    }
                 }
-            }
-            else if(strcmp(command, COMMAND_QUEUE) == 0)
-            {
-                if(param.length() > 0)
+                else
                 {
-                    ProcessQueueCommand(atoi(param.c_str()));
+                    error = true;
+                }               
+            }
+            else if(command.compare(COMMAND_QUEUE) == 0)
+            {
+                if(paramCount > 0)
+                {
+                    ProcessQueueCommand(atoi(params[0].c_str()));
+                }
+                else
+                {
+                    error = true;
                 }
             } 
-            else if(strcmp(command, COMMAND_SCORE) == 0)
+            else if(command.compare(COMMAND_SCORE) == 0)
             {
-                if(param.length() > 0)
+                if(paramCount > 0)
                 {
-                    ProcessScoreCommand(atoi(param.c_str()));
+                    ProcessScoreCommand(atoi(params[0].c_str()));
+                }
+                else
+                {
+                    error = true;
                 }
             }              
-            else if(strcmp(command, COMMAND_CORRECT_RESPONSE) == 0)
+            else if(command.compare(COMMAND_CORRECT_RESPONSE) == 0)
             {
                 ProcessCorrectResponseCommand();
             }
-            else if(strcmp(command, COMMAND_INCORRECT_RESPONSE) == 0)
+            else if(command.compare(COMMAND_INCORRECT_RESPONSE) == 0)
             {
                 ProcessIncorrectResponseCommand();
             } 
-            else if(strcmp(command, COMMAND_RESET) == 0)
+            else if(command.compare(COMMAND_RESET) == 0)
             {
-                if(param.length() > 0)
+                if(paramCount > 0)
                 {
-                    ProcessResetCommand((bool)atoi(param.c_str()));
-                }                
+                    ProcessResetCommand((bool)atoi(params[0].c_str()));
+                }
+                else
+                {
+                    error = true;
+                }
             }
-            else if(strcmp(command, COMMAND_OFF) == 0)
+            else if(command.compare(COMMAND_OFF) == 0)
             {
                 ProcessOffCommand();
             }
-            else if(strcmp(command, COMMAND_SELECT) == 0)
+            else if(command.compare(COMMAND_SELECT) == 0)
             {
                 ProcessSelectCommand();
             }                                                                                                                          
+        }
+        else
+        {
+            error = true;
+        }
+
+        if(error)
+        {
+            Serial.println("ERROR");
         }
     }
 }
@@ -517,10 +562,11 @@ BuzzoButton::StateId BuzzoButton::GetState()
 }
 
 
-void BuzzoButton::ProcessAnswerCommand(int timer)
+void BuzzoButton::ProcessAnswerCommand(int timeLeft, int totalTime)
 {
     SetState(BuzzoButton::ANSWERING);
-    _answeringTimeRemaining = timer;
+    _answeringTimeRemaining = timeLeft;
+    _answeringTotalTime = totalTime;
 }
 
 void BuzzoButton::ProcessQueueCommand(int placeInQueue)

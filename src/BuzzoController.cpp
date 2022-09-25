@@ -4,11 +4,9 @@
 #include "BuzzoController.h"
 #include "Commands.h"
 
-#define RESPONSE_TIME_LIMIT (60 * 1000)
+#define RESPONSE_TIME_LIMIT 60
 #define TIME_BETWEEN_RESPONDERS (1 * 1000)
 #define RESPONDANT_PING_TIME 500
-
-#define CLIENT_TIMER_MAX 255
 
 
 inline std::string trim(const std::string &s)
@@ -208,12 +206,14 @@ void BuzzoController::ProcessBuzzCommand(IPAddress ip)
 #pragma endregion
 
 #pragma region Command Functions
-void BuzzoController::SendAnswerCommand(IPAddress ip, int timer)
+void BuzzoController::SendAnswerCommand(IPAddress ip, int timer, int totalTime)
 {
     udp.beginPacket(ip, PORT);
     udp.print(COMMAND_ANSWER);
     udp.print(" ");
-    udp.println(timer);
+    udp.print(timer);
+    udp.print(" ");
+    udp.println(totalTime);
     udp.endPacket();
 }
 
@@ -289,8 +289,8 @@ void BuzzoController::UpdatePlaying()
 
             if(client != 0)
             {
-                float timeRemaining = timeResponding / RESPONSE_TIME_LIMIT;
-                SendAnswerCommand(client->GetIpAddress(), max(0, (int)(1.0f - timeRemaining) * 255));
+                float timeRemaining = timeResponding / (RESPONSE_TIME_LIMIT * 1000);
+                SendAnswerCommand(client->GetIpAddress(), ceil(timeRemaining), RESPONSE_TIME_LIMIT);
             }
 
             _lastRespondantPingTime = millis();
@@ -324,7 +324,7 @@ void BuzzoController::UpdatePlaying()
                 _currentRespondant.assign(client->GetId());
                 _responseStartTime = millis();
 
-                SendAnswerCommand(client->GetIpAddress(), CLIENT_TIMER_MAX);
+                SendAnswerCommand(client->GetIpAddress(), RESPONSE_TIME_LIMIT, RESPONSE_TIME_LIMIT);
                 _lastRespondantPingTime = millis();
             }
 

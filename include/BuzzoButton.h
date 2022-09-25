@@ -51,7 +51,7 @@ class BuzzoButton
         BuzzoButton();
         void ProcessPacket();
 
-        void ProcessAnswerCommand(int timer);
+        void ProcessAnswerCommand(int timeLeft, int totalTime);
         void ProcessQueueCommand(int placeInQueue);
         void ProcessCorrectResponseCommand();
         void ProcessIncorrectResponseCommand();
@@ -106,6 +106,7 @@ class BuzzoButton
 
         int _currentScore;
         int _answeringTimeRemaining;
+        int _answeringTotalTime;
         int _placeInQueue;
 
         bool _isShowingScore;
