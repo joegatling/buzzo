@@ -45,6 +45,10 @@ class BuzzoButton
         int GetScore() { return _currentScore; }
         int GetPlaceInQueue() { return _placeInQueue; }
 
+        unsigned long TimeSinceLastButtonPress() { return millis() - _lastButtonPressTime; } 
+
+        void DisableLights();
+
     private:
         static BuzzoButton* _instance;
 
@@ -112,7 +116,6 @@ class BuzzoButton
         bool _isShowingScore;
 
         unsigned long _stateEnterTime;
-
         unsigned long _lastButtonPressTime;
 
         bool _canBuzz;

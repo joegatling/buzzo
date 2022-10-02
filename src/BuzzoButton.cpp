@@ -35,15 +35,11 @@ void IdleEnter(BuzzoButton* button)
 
     button->_strip.setBrightness(50);
     button->_strip.clear();
-
-
-
-    button->_lastButtonPressTime = 0;
 }
 
 void IdleUpdate(BuzzoButton* button)
 {
-    if(button->_lastButtonPressTime > 0 && millis() - button->_lastButtonPressTime < 200)
+    if(button->_lastButtonPressTime > button->_stateEnterTime &&  millis() - button->_lastButtonPressTime < 200)
     {
         button->_strip.setBrightness(255);
         button->_strip.fill(button->_strip.Color(255,255,255));
@@ -561,6 +557,11 @@ BuzzoButton::StateId BuzzoButton::GetState()
     return _currentState;
 }
 
+void BuzzoButton::DisableLights()
+{
+    _strip.clear();
+    _strip.show();
+}
 
 void BuzzoButton::ProcessAnswerCommand(int timeLeft, int totalTime)
 {
