@@ -41,12 +41,10 @@ _isAcceptingResponses(true)
 
 void BuzzoController::Initialize()
 {
-    _correctButton.SetEndPressCallback([](){ BuzzoController::GetInstance()->EndCurrentRespondantTurn(true); });
-    
+    _correctButton.SetEndPressCallback([](){ BuzzoController::GetInstance()->EndCurrentRespondantTurn(true); });    
     _incorrectButton.SetEndPressCallback([](){ BuzzoController::GetInstance()->EndCurrentRespondantTurn(false); });
-    
     _ResetButton.SetEndPressCallback([](){ BuzzoController::GetInstance()->BeginResetButtonPress(); });
-    _ResetButton.SetHoldCallback([](){ BuzzoController::GetInstance()->HoldResetButton(); });
+    _ResetButton.SetBeginHoldCallback([](){ BuzzoController::GetInstance()->HoldResetButton(); });
 }
 
 void BuzzoController::Update()
@@ -417,8 +415,6 @@ void BuzzoController::EndCurrentRespondantTurn(bool isCorrect)
                 SendResponseCommand(client->GetIpAddress(), isCorrect);
             }
 
-            _currentRespondant.assign("");
-
             if(isCorrect)
             {
                 _isAcceptingResponses = false;
@@ -433,6 +429,7 @@ void BuzzoController::EndCurrentRespondantTurn(bool isCorrect)
             }
             else
             {
+                _currentRespondant.assign("");
                 _nextResponderDelayStartTime = millis();
             }
         }

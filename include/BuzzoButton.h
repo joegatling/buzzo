@@ -1,10 +1,12 @@
 #pragma once
 
 #include <WiFiudp.h>
-#include <Adafruit_NeoPixel.h>
+//#include <Adafruit_NeoPixel.h>
+#include <NeoPixelBrightnessBus.h>
+#include <SimpleButton.h>
 
 #include "BuzzoButtonState.h"
-#include "SimpleButton.h"
+#include "ToneGenerator.h"
 
 #define PACKET_MAX_SIZE 1024
 #define PING_INTERVAL 20000
@@ -110,16 +112,25 @@ class BuzzoButton
 
         int _currentScore;
         int _answeringTimeRemaining;
-        int _answeringTotalTime;
+        int _answeringTotalTime;        
         int _placeInQueue;
 
+        bool _hasStartedWarning;
+
         bool _isShowingScore;
+
+        bool _hasConnected;
 
         unsigned long _stateEnterTime;
         unsigned long _lastButtonPressTime;
 
         bool _canBuzz;
 
-        Adafruit_NeoPixel _strip;
+        RgbColor _wedgeColors[7];
+
+        //Adafruit_NeoPixel _strip;
+        NeoPixelBrightnessBus<NeoGrbFeature, Neo800KbpsMethod> _strip;
+
+        ToneGenerator _toneGenerator;
 
 };

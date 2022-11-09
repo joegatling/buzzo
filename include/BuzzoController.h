@@ -2,9 +2,9 @@
 
 #include <string>
 #include <WiFiudp.h>
+#include <SimpleButton.h>
 
 #include "ButtonClientInfo.h"
-#include "SimpleButton.h"
 #include "ResponseQueue.h"
 
 #define PACKET_MAX_SIZE 1024

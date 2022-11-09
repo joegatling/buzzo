@@ -39,6 +39,9 @@ unsigned long wakeTime = 0;
 void Sleep()
 {
     BuzzoButton::GetInstance()->DisableLights();
+
+    delay(100);
+
     esp_sleep_enable_ext0_wakeup(GPIO_NUM_32, LOW);
     esp_deep_sleep_start();
 }
@@ -93,38 +96,41 @@ void loop()
 
 void loop() 
 {  
-  unsigned long timeSinceWake = millis() - wakeTime;
-  unsigned long idleTime = min(timeSinceWake, BuzzoButton::GetInstance()->TimeSinceLastButtonPress());
-
-  if(WiFi.status() != WL_CONNECTED)
+  if(BuzzoButton::GetInstance()->GetState() != BuzzoButton::NONE)
   {
-    if(isConnected == true)
-    {
-      Serial.println("Disconnected");
-      isConnected = false;
-      BuzzoButton::GetInstance()->SetState(BuzzoButton::DISCONNECTED);
-    }
+    unsigned long timeSinceWake = millis() - wakeTime;
+    unsigned long idleTime = min(timeSinceWake, BuzzoButton::GetInstance()->TimeSinceLastButtonPress());
 
-    if(idleTime > DISCONNECTED_SLEEP_TIMER)
+    if(WiFi.status() != WL_CONNECTED)
     {
-      Sleep();
-    }
-  }
-  else
-  {
-    if(isConnected == false)
-    {
-      Serial.println("Reconnected");
-      isConnected = true;
-      WiFi.setAutoReconnect(true);
+      if(isConnected == true)
+      {
+        Serial.println("Disconnected");
+        isConnected = false;
+        BuzzoButton::GetInstance()->SetState(BuzzoButton::DISCONNECTED);
+      }
 
-      BuzzoButton::GetInstance()->SetState(BuzzoButton::IDLE);
+      if(idleTime > DISCONNECTED_SLEEP_TIMER)
+      {
+        Sleep();
+      }
     }
-
-    if(idleTime > CONNECTED_SLEEP_TIMER)
+    else
     {
-      Sleep();
-    }    
+      if(isConnected == false)
+      {
+        Serial.println("Reconnected");
+        isConnected = true;
+        WiFi.setAutoReconnect(true);
+
+        BuzzoButton::GetInstance()->SetState(BuzzoButton::IDLE);
+      }
+
+      if(idleTime > CONNECTED_SLEEP_TIMER)
+      {
+        Sleep();
+      }    
+    }
   }
   
   BuzzoButton::GetInstance()->Update(); 

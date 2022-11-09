@@ -7,8 +7,11 @@
 #include <sstream>
 #include <iterator>
 
+
 #include "BuzzoButton.h"
 #include "Commands.h"
+
+#define DEMO_MODE
 
 float mapf(float x, float in_min, float in_max, float out_min, float out_max) 
 {
@@ -33,43 +36,54 @@ void IdleEnter(BuzzoButton* button)
     //TODO: Turn off the lights
     //TODO: Show current score
 
-    button->_strip.setBrightness(50);
-    button->_strip.clear();
+    button->_strip.SetBrightness(50);
+    button->_strip.ClearTo(RgbColor(0,0,0));
 }
 
 void IdleUpdate(BuzzoButton* button)
 {
+    #ifdef DEMO_MODE
+
+    button->_currentScore = (millis() / 1000) % 7;
+
+    #endif
+
     if(button->_lastButtonPressTime > button->_stateEnterTime &&  millis() - button->_lastButtonPressTime < 200)
     {
-        button->_strip.setBrightness(255);
-        button->_strip.fill(button->_strip.Color(255,255,255));
-        button->_strip.show();
+        button->_strip.SetBrightness(255);
+        button->_strip.ClearTo(RgbColor(255,255,255));
+        button->_strip.Show();
     }
     else
     {
         if(button->_currentScore >= 6)
         {
-            button->_strip.setBrightness(255);
-            uint16_t hue = (millis() * 50) % 0xFFFF;
-            button->_strip.rainbow(hue,1,255, 32);
+            button->_strip.SetBrightness(255);
+            // uint16_t hue = (millis() * 50) % 0xFFFF;
+            // button->_strip.rainbow(hue,1,255, 32);
+            for(int i = 0; i < button->_strip.PixelCount(); i++)
+            {            
+                button->_strip.SetPixelColor(i, button->_wedgeColors[i]);                 
+            }
+            button->_strip.Show();
         }
         else
         {
-            button->_strip.setBrightness(64);
+            button->_strip.SetBrightness(128);
 
-            for(int i = 0; i < button->_strip.numPixels(); i++)
+            for(int i = 0; i < button->_strip.PixelCount(); i++)
             {
                 if(i < button->_currentScore)
                 {
-                    button->_strip.setPixelColor(i, 255, 255, 255);                 
+                    button->_strip.SetPixelColor(i, button->_wedgeColors[i]);                 
                 }
                 else
                 {
-                    button->_strip.setPixelColor(i, 0, 0, 0);                 
+                    button->_strip.SetPixelColor(i, RgbColor(0, 0, 0));
                 }
             }
+            button->_strip.Show();
         }
-        button->_strip.show();
     }
 }
 
@@ -79,42 +93,63 @@ void IdleExit(BuzzoButton* button)
 }
 
 void AnsweringEnter(BuzzoButton* button)
-{}
+{
+    button->_hasStartedWarning = false;
+    button->_toneGenerator.DoSound(ToneGenerator::RESPOND, false);
+}
 
 void AnsweringUpdate(BuzzoButton* button)
 {
-    button->_strip.setBrightness(255);
+    button->_strip.SetBrightness(255);
 
     const float pulseAmount = 64;
     float pulse = 255 - pulseAmount + sin(millis() / 100.0f) * pulseAmount;
 
-    for(int i = 0; i < button->_strip.numPixels(); i++)
+    for(int i = 0; i < button->_strip.PixelCount(); i++)
     {
         if(i < ceil(button->_answeringTimeRemaining / button->_answeringTotalTime))
         {
-            button->_strip.setPixelColor(i, pulse, pulse, 0);
+            button->_strip.SetPixelColor(i, RgbColor(pulse, pulse, 0));
         }
         else
         {
-            button->_strip.setPixelColor(i, 8, 8, 0);
+            button->_strip.SetPixelColor(i, RgbColor(8, 8, 0));
         }
     }
     
-    button->_strip.show();
+    if(button->_answeringTimeRemaining < 10 && button->_hasStartedWarning == false)
+    {
+        button->_hasStartedWarning = true;
+        button->_toneGenerator.StartTicking();
+    }
+
+    button->_strip.Show();
 }
 
 void AnsweringExit(BuzzoButton* button)
-{}
+{
+    button->_toneGenerator.StopTicking();    
+}
 
 void CorrectEnter(BuzzoButton* button)
 {
-    button->_strip.setBrightness(255);
-    button->_strip.fill(button->_strip.Color(0, 255, 0));
-    button->_strip.show();
+    button->_strip.SetBrightness(255);
+    button->_strip.ClearTo(RgbColor(0, 255, 0));
+    button->_strip.Show();
 
-    button->_currentScore = 6;
+    //button->_currentScore = 6;
 
     button->_canBuzz = false;   
+
+    if(button->_currentScore == 6)
+    {
+        button->_toneGenerator.DoSound(ToneGenerator::VICTORY);
+    }
+    else
+    {
+        button->_toneGenerator.DoSound(ToneGenerator::CORRECT);
+    }
+
 }
 
 void CorrectUpdate(BuzzoButton* button)
@@ -126,19 +161,19 @@ void CorrectUpdate(BuzzoButton* button)
 
     if(timeInState < fadeBegin)
     {
-        button->_strip.setBrightness(255);
+        button->_strip.SetBrightness(255);
 
         if(button->_currentScore >= 6)
         {
             uint16_t hue = (millis() * 50) % 0xFFFF;
-            button->_strip.rainbow(hue,1,255, 255);
+            //button->_strip.rainbow(hue,1,255, 255);
         }
         else
         {
-            button->_strip.fill(button->_strip.Color(0,255,0));
+            button->_strip.ClearTo(RgbColor(0,255,0));
         }
 
-        button->_strip.show();
+        button->_strip.Show();
     }
     else if(timeInState < fadeBegin + fadeDuration)
     {
@@ -147,28 +182,28 @@ void CorrectUpdate(BuzzoButton* button)
             uint8_t brightness = mapf((timeInState - fadeBegin) / (float)(fadeDuration), 0.0f, 1.0f, 255, 64);
 
             uint16_t hue = (millis() * 50) % 0xFFFF;
-            button->_strip.rainbow(hue,1,255, brightness);
+           // button->_strip.rainbow(hue,1,255, brightness);
         }
         else
         {
-            for(int i = 0; i < button->_strip.numPixels(); i++)
+            for(int i = 0; i < button->_strip.PixelCount(); i++)
             {
                 uint8_t targetBrightness = i < button->_currentScore ? 96 : 8;
                 uint8_t brightness = mapf((timeInState - fadeBegin) / (float)(fadeDuration), 0.0f, 1.0f, 255, targetBrightness);
 
                 
-                button->_strip.setPixelColor(i, 0, brightness, 0);
+                button->_strip.SetPixelColor(i, RgbColor(0, brightness, 0));
             }
         }
 
 
-        button->_strip.show();
+        button->_strip.Show();
     }
     else if(button->_currentScore >= 6)
     {
         uint16_t hue = (millis() * 50) % 0xFFFF;
-        button->_strip.rainbow(hue,1,255, 64);
-        button->_strip.show();
+        //button->_strip.rainbow(hue,1,255, 64);
+        button->_strip.Show();
     }
 }
 
@@ -178,11 +213,13 @@ void CorrectExit(BuzzoButton* button)
 
 void IncorrectEnter(BuzzoButton* button)
 {
-    button->_strip.setBrightness(255);
-    button->_strip.fill(button->_strip.Color(255,0,0));
-    button->_strip.show();
+    button->_strip.SetBrightness(255);
+    button->_strip.ClearTo(RgbColor(255,0,0));
+    button->_strip.Show();
 
     button->_canBuzz = false;
+
+    button->_toneGenerator.DoSound(ToneGenerator::INCORRECT);
 }
 
 void IncorrectUpdate(BuzzoButton* button)
@@ -194,21 +231,21 @@ void IncorrectUpdate(BuzzoButton* button)
 
     if(timeInState < fadeBegin)
     {
-        button->_strip.setBrightness(255);
-        button->_strip.fill(button->_strip.Color(255,0,0));
-        button->_strip.show();
+        button->_strip.SetBrightness(255);
+        button->_strip.ClearTo(RgbColor(255,0,0));
+        button->_strip.Show();
     }
     else if(timeInState < fadeBegin + fadeDuration)
     {
-        for(int i = 0; i < button->_strip.numPixels(); i++)
+        for(int i = 0; i < button->_strip.PixelCount(); i++)
         {
             uint8_t targetBrightness = i < button->_currentScore ? 96 : 8;
             uint8_t brightness = mapf((timeInState - fadeBegin) / (float)(fadeDuration), 0.0f, 1.0f, 255, targetBrightness);
 
-            button->_strip.setPixelColor(i, brightness, 0, 0);
+            button->_strip.SetPixelColor(i, RgbColor(brightness, 0, 0));
         }
 
-        button->_strip.show();
+        button->_strip.Show();
     }
 }
 
@@ -218,7 +255,7 @@ void IncorrectExit(BuzzoButton* button)
 
 void QueuedEnter(BuzzoButton* button)
 {
-    button->_strip.setBrightness(255);
+    button->_strip.SetBrightness(255);
     button->_placeInQueue = 1;
 }
 
@@ -227,10 +264,10 @@ void QueuedUpdate(BuzzoButton* button)
     float offset = millis() / 2000.0f;
     offset = ((sin((offset + 0.5f)* TWO_PI) + (offset + 0.5f) * TWO_PI) / TWO_PI) - 0.5f;
 
-    int count = button->_strip.numPixels();
+    int count = button->_strip.PixelCount();
 
-    uint16_t colorA = 40000;
-    uint16_t colorB = 45000;
+    float colorA = 40000/0xFFFF;
+    float colorB = 45000/0xFFFF;
 
     uint8_t patterns[3] = { 0b0000001, 0b00001001, 0b00000000 };
 
@@ -243,7 +280,7 @@ void QueuedUpdate(BuzzoButton* button)
 
     // Serial.print(patterns[button->_placeInQueue], BIN);
     // Serial.print(" -> ");
-    for(int i = 0; i < button->_strip.numPixels(); i++)
+    for(int i = 0; i < button->_strip.PixelCount(); i++)
     {
         float index = fmodf(offset + i, count);
         float t = fmodf(index, 1.0f);
@@ -259,18 +296,18 @@ void QueuedUpdate(BuzzoButton* button)
 
         float f = a * (1.0f - t) + b * t;
 
-        uint16_t hue = mapf(f, 0.0f, 1.0f, colorB, colorA);
-        uint8_t sat = 255;
-        uint8_t val = (uint8_t)mapf(f, 0.0f, 1.0f, 1.0f, 20.0f);
+        float hue = mapf(f, 0.0f, 1.0f, colorB, colorA);
+        float sat = 1.0f;
+        float val = (uint8_t)mapf(f, 0.0f, 1.0f, 0.1f, 0.5f);
 
-        auto color = button->_strip.ColorHSV(hue,sat,val);
-        button->_strip.setPixelColor(i, color);
+        auto color = HsbColor(hue,sat,val);
+        button->_strip.SetPixelColor(i, color);
     }
 
 
     //Serial.println("");
 
-    button->_strip.show();
+    button->_strip.Show();
 }
 
 void QueuedExit(BuzzoButton* button)
@@ -279,22 +316,34 @@ void QueuedExit(BuzzoButton* button)
 }
 
 void DisconnectedEnter(BuzzoButton* button)
-{}
+{
+    if(button->_hasConnected)
+    {
+        button->_toneGenerator.DoSound(ToneGenerator::DISCONNECTED);
+    }
+}
 
 void DisconnectedUpdate(BuzzoButton* button)
 {
-    for(int i = 0; i < button->_strip.numPixels(); i++)
+    for(int i = 0; i < button->_strip.PixelCount(); i++)
     {
-        bool isOn = ((millis() / 200) % button->_strip.numPixels()) == i;
-        button->_strip.setPixelColor(i, isOn ? button->_strip.Color(64,64,64) : button->_strip.Color(0,0,0));
+        bool isOn = ((millis() / 200) % button->_strip.PixelCount()) == i;
+        button->_strip.SetPixelColor(i, isOn ? RgbColor(64,64,64) : RgbColor(0,0,0));
     }    
-    button->_strip.show();
+    button->_strip.Show();
 }
 
 void DisconnectedExit(BuzzoButton* button)
 {
-    button->_strip.clear();
-    button->_strip.show();
+    if(button->_nextState != BuzzoButton::NONE)
+    {
+        button->_toneGenerator.DoSound(ToneGenerator::CONNECTED);
+    }
+
+    button->_strip.ClearTo(RgbColor(0));
+    button->_strip.Show();
+
+    button->_hasConnected = true;
 }
 
 
@@ -309,6 +358,26 @@ void OnButtonPress(BuzzoButton* button)
     {
         button->SendBuzzCommand();
     }
+
+    if(button->GetState() != BuzzoButton::DISCONNECTED)
+    {
+        button->_toneGenerator.DoSound(ToneGenerator::BUZZ);
+    }
+
+}
+
+void OnButtonHold(BuzzoButton* button)
+{
+    button->DisableLights();
+    button->SetState(BuzzoButton::NONE);
+}
+
+void OnButtonHoldRelease(BuzzoButton* button)
+{
+    delay(100);
+
+    esp_sleep_enable_ext0_wakeup(GPIO_NUM_32, LOW);
+    esp_deep_sleep_start();    
 }
 
 inline std::string trim(const std::string &s)
@@ -334,14 +403,24 @@ _controllerIp(192,168,1,1),
 _currentScore(0),
 _canBuzz(false),
 _button(BUZZER_BUTTON_PIN),
-_strip(6, NEOPIXEL_PIN, NEO_GRB + NEO_KHZ800),
+_strip(6, NEOPIXEL_PIN),
 _lastButtonPressTime(0),
 _currentState(BuzzoButton::NONE),
-_nextState(BuzzoButton::NONE)
+_nextState(BuzzoButton::NONE),
+_toneGenerator(),
+_hasConnected(false)
 {
-    _strip.begin();
-    _strip.setBrightness(50);
-    _strip.show(); // Initialize all pixels to 'off'
+    _strip.Begin();
+    _strip.SetBrightness(50);
+    _strip.Show(); // Initialize all pixels to 'off'
+
+    _wedgeColors[0] = RgbColor(255,255,255);
+    _wedgeColors[1] = RgbColor(0,255,0);
+    _wedgeColors[2] = RgbColor(255,0,0);
+    _wedgeColors[3] = RgbColor(0,255,255);
+    _wedgeColors[4] = RgbColor(255,0,255);
+    _wedgeColors[5] = RgbColor(255,96,0);
+    _wedgeColors[6] = RgbColor(255,255,0);
 
     for(int i = 0; i < STATE_COUNT; i++)
     {
@@ -356,6 +435,8 @@ _nextState(BuzzoButton::NONE)
     _states[DISCONNECTED] = new BuzzoButtonState(&DisconnectedEnter, &DisconnectedUpdate, &DisconnectedExit);
 
     _button.SetBeginPressCallback([]() { OnButtonPress(BuzzoButton::GetInstance()); });    
+    _button.SetBeginHoldCallback([]() { OnButtonHold(BuzzoButton::GetInstance()); });    
+    _button.SetEndHoldCallback([]() { OnButtonHoldRelease(BuzzoButton::GetInstance()); });    
 
     udp.begin(PORT);
 
@@ -363,6 +444,7 @@ _nextState(BuzzoButton::NONE)
     strcpy(_uniqueId, WiFi.macAddress().c_str());
     Serial.print("Unique ID: ");
     Serial.println(_uniqueId);
+
 }
 
 void BuzzoButton::Initialize()
@@ -371,6 +453,7 @@ void BuzzoButton::Initialize()
 void BuzzoButton::Update()
 {
     _button.Update();
+    _toneGenerator.Update();
     
     if(_nextState != _currentState)
     {
@@ -559,8 +642,8 @@ BuzzoButton::StateId BuzzoButton::GetState()
 
 void BuzzoButton::DisableLights()
 {
-    _strip.clear();
-    _strip.show();
+    _strip.ClearTo(RgbColor(0));
+    _strip.Show();
 }
 
 void BuzzoButton::ProcessAnswerCommand(int timeLeft, int totalTime)
