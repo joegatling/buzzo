@@ -12,8 +12,8 @@
 
 #define PORT 8888
 
-#define CORRECT_BUTTON_PIN 14
-#define INCORRECT_BUTTON_PIN 32
+#define CORRECT_BUTTON_PIN 32
+#define INCORRECT_BUTTON_PIN 14
 #define RESET_BUTTON_PIN 15
 
 class BuzzoController
@@ -34,6 +34,10 @@ class BuzzoController
         void BeginIncorrectButtonPress();
         void BeginResetButtonPress();      
         void HoldResetButton();  
+
+        unsigned long TimeSinceLastButtonPress() { return millis() - _lastButtonPressTime; } 
+
+        int GetActiveClientCount();
 
     private:
         static BuzzoController* _instance;
@@ -70,10 +74,11 @@ class BuzzoController
 
         WiFiUDP udp;
 
-        unsigned int _lastSendTime = 0;
-        unsigned int _responseStartTime = 0;
-        unsigned int _nextResponderDelayStartTime = 0;
-        unsigned int _lastRespondantPingTime = 0;
+        unsigned long _lastSendTime = 0;
+        unsigned long _responseStartTime = 0;
+        unsigned long _nextResponderDelayStartTime = 0;
+        unsigned long _lastRespondantPingTime = 0;
+        unsigned long _lastButtonPressTime = 0;
 
         bool _isAcceptingResponses = true;
 
@@ -81,7 +86,7 @@ class BuzzoController
 
         SimpleButton _correctButton;
         SimpleButton _incorrectButton;
-        SimpleButton _ResetButton;
+        SimpleButton _resetButton;
 
         ResponseQueue<std::string> _responseQueue;
         std::string _currentRespondant;

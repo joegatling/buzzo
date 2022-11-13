@@ -12,21 +12,21 @@
             "type": "platformio-debug",
             "request": "launch",
             "name": "PIO Debug",
-            "executable": "/Users/joegatling/Documents/git/buzzo/.pio/build/buzzo_button/firmware.elf",
-            "projectEnvName": "buzzo_button",
+            "executable": "/Users/joegatling/Documents/git/buzzo/.pio/build/buzzo_controller/firmware.elf",
+            "projectEnvName": "buzzo_controller",
             "toolchainBinDir": "/Users/joegatling/.platformio/packages/toolchain-xtensa-esp32/bin",
             "internalConsoleOptions": "openOnSessionStart",
             "preLaunchTask": {
                 "type": "PlatformIO",
-                "task": "Pre-Debug (buzzo_button)"
+                "task": "Pre-Debug (buzzo_controller)"
             }
         },
         {
             "type": "platformio-debug",
             "request": "launch",
             "name": "PIO Debug (skip Pre-Debug)",
-            "executable": "/Users/joegatling/Documents/git/buzzo/.pio/build/buzzo_button/firmware.elf",
-            "projectEnvName": "buzzo_button",
+            "executable": "/Users/joegatling/Documents/git/buzzo/.pio/build/buzzo_controller/firmware.elf",
+            "projectEnvName": "buzzo_controller",
             "toolchainBinDir": "/Users/joegatling/.platformio/packages/toolchain-xtensa-esp32/bin",
             "internalConsoleOptions": "openOnSessionStart"
         },
@@ -34,8 +34,8 @@
             "type": "platformio-debug",
             "request": "launch",
             "name": "PIO Debug (without uploading)",
-            "executable": "/Users/joegatling/Documents/git/buzzo/.pio/build/buzzo_button/firmware.elf",
-            "projectEnvName": "buzzo_button",
+            "executable": "/Users/joegatling/Documents/git/buzzo/.pio/build/buzzo_controller/firmware.elf",
+            "projectEnvName": "buzzo_controller",
             "toolchainBinDir": "/Users/joegatling/.platformio/packages/toolchain-xtensa-esp32/bin",
             "internalConsoleOptions": "openOnSessionStart",
             "loadMode": "manual"

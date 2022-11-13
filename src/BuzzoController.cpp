@@ -1,5 +1,8 @@
 #include <string>
 #include <Arduino.h>
+#include <iostream>
+#include <string>
+#include <sstream>
 
 #include "BuzzoController.h"
 #include "Commands.h"
@@ -8,6 +11,7 @@
 #define TIME_BETWEEN_RESPONDERS (1 * 1000)
 #define RESPONDANT_PING_TIME 500
 
+#define MAX_SCORE 6
 
 inline std::string trim(const std::string &s)
 {
@@ -30,7 +34,7 @@ BuzzoController* BuzzoController::GetInstance()
 BuzzoController::BuzzoController():
 _correctButton(CORRECT_BUTTON_PIN),
 _incorrectButton(INCORRECT_BUTTON_PIN),
-_ResetButton(RESET_BUTTON_PIN),
+_resetButton(RESET_BUTTON_PIN),
 _responseQueue(MAX_CLIENTS),
 _isAcceptingResponses(true)
 {
@@ -43,8 +47,9 @@ void BuzzoController::Initialize()
 {
     _correctButton.SetEndPressCallback([](){ BuzzoController::GetInstance()->EndCurrentRespondantTurn(true); });    
     _incorrectButton.SetEndPressCallback([](){ BuzzoController::GetInstance()->EndCurrentRespondantTurn(false); });
-    _ResetButton.SetEndPressCallback([](){ BuzzoController::GetInstance()->BeginResetButtonPress(); });
-    _ResetButton.SetBeginHoldCallback([](){ BuzzoController::GetInstance()->HoldResetButton(); });
+    _resetButton.SetEndPressCallback([](){ BuzzoController::GetInstance()->BeginResetButtonPress(); });
+    _resetButton.SetBeginHoldCallback([](){ BuzzoController::GetInstance()->HoldResetButton(); });
+    _resetButton.SetLongPressDuration(3000);
 }
 
 void BuzzoController::Update()
@@ -53,7 +58,7 @@ void BuzzoController::Update()
 
     _correctButton.Update();
     _incorrectButton.Update();
-    _ResetButton.Update();
+    _resetButton.Update();
 
     if(_currentState == BuzzoController::PLAYING)
     {
@@ -84,42 +89,70 @@ void BuzzoController::ProcessPacket()
         Serial.println("Contents:");
         Serial.println(packetBuffer); 
 
-        if(packetSize >= 3)
-        {
-            char command[LEN_COMMAND+1];
-            command[LEN_COMMAND] = 0;
+        std::stringstream data(packetBuffer);
+        std::string command;
 
-            for(int i = 0; i < 3; i++)
+        data >> command;        
+
+        bool error = false;
+
+        if(command.length() == 3)
+        {
+            std::string params[2];
+            int paramCount = 0;
+
+            while(data || paramCount >= sizeof(params))
             {
-                command[i] = packetBuffer[i];
-            }
+                data >> params[paramCount++];
+            }            
 
             // Process Packet
-            if(strcmp(command, COMMAND_BUZZ) == 0)
+            if(command.compare(COMMAND_BUZZ) == 0)
             {
                 ProcessBuzzCommand(udp.remoteIP());
             }
-            else if(strcmp(command, COMMAND_REGISTER) == 0)
+            else if(command.compare(COMMAND_REGISTER) == 0)
             {
-                if(packetSize > 3)
+                if(paramCount > 0)
                 {
-                    std::string param(command+3);
-                    param = trim(param);
-                    
-                    ProcessRegisterCommand(udp.remoteIP(), param);                    
+                    ProcessRegisterCommand(udp.remoteIP(), params[0]);                    
                 }
-            }                                                                                     
+                else
+                {
+                    error = true;
+                }
+            }    
+            else
+            {
+                error = true;
+            }                                                                                 
         }
+        else
+        {
+            error = true;
+        }
+
+        if(error)
+        {
+            Serial.println("ERROR");
+        }        
     }
 }
 
 void BuzzoController::ProcessRegisterCommand(IPAddress ip, std::string param)
 {
+    Serial.println("Registering Client");
+    Serial.print("ID ");
+    Serial.println(param.c_str());
+
     for(int i = 0; i < _clientCount; i++)
     {
         if(_clients[i]->GetId().compare(param) == 0)
         {
+            Serial.println("Resetting Contact Time...");
             _clients[i]->ResetTimeSinceLastContact();
+
+            Serial.println(_clients[i]->GetTimeSinceLastContact());
 
             // An entry with a different IP is associated with this ID. This
             // means the button has been assigned a new IP.
@@ -180,25 +213,34 @@ void BuzzoController::ProcessRegisterCommand(IPAddress ip, std::string param)
 
 void BuzzoController::ProcessBuzzCommand(IPAddress ip)
 {
+    Serial.print("Processing buzz command from ");
+    Serial.println(ip.toString());
+
     auto client = GetClient(ip);
+
+    Serial.print("Client ID ");
+    Serial.println(client->GetId().c_str());    
 
     if(client != 0)
     {
         client->ResetTimeSinceLastContact();
 
-        if(!_responseQueue.ContainsResponse(client->GetId()))
+        if(client->GetScore() < MAX_SCORE)
         {
-            _responseQueue.EnqueueResponse(client->GetId());
-        }
+            if(!_responseQueue.ContainsResponse(client->GetId()))
+            {
+                _responseQueue.EnqueueResponse(client->GetId());
+            }
 
-        // If there is more than one in the response queue, tell this button that 
-        // it needs to wait before it can respond.
-        if(_responseQueue.GetResponseCount() > 1)
-        {
-            SendQueueCommand(ip, _responseQueue.GetResponseCount());
-        }
+            // If there is more than one in the response queue, tell this button that 
+            // it needs to wait before it can respond.
+            if(_responseQueue.GetResponseCount() > 1)
+            {
+                SendQueueCommand(ip, _responseQueue.GetResponseCount());
+            }
 
-        // Note: A respondant will be selected in the next update, so all we need to here is enqueue
+            // Note: A respondant will be selected in the next update, so all we need to here is enqueue
+        }
     }
 }
 #pragma endregion
@@ -278,34 +320,43 @@ void BuzzoController::UpdatePlaying()
 {
     if(_currentRespondant.length() > 0)
     {
-        unsigned long timeResponding = millis() - _responseStartTime;
-
-        // Update respondant timer
-        if(millis() - _lastRespondantPingTime > RESPONDANT_PING_TIME)
+        if(_isAcceptingResponses) // If this is false, we have already received the correct answer
         {
-            auto client = GetClient(_currentRespondant);
+            unsigned long millisResponding = millis() - _responseStartTime;
+            int secondsResponding = floor(millisResponding / 1000);
+            
 
-            if(client != 0)
+            // Update respondant timer
+            if(millis() - _lastRespondantPingTime > RESPONDANT_PING_TIME)
             {
-                float timeRemaining = timeResponding / (RESPONSE_TIME_LIMIT * 1000);
-                SendAnswerCommand(client->GetIpAddress(), ceil(timeRemaining), RESPONSE_TIME_LIMIT);
+                Serial.print("Time responding: ");
+                Serial.println(millisResponding);
+
+                auto client = GetClient(_currentRespondant);
+
+                if(client != 0)
+                {
+                    int secondsRemaining = RESPONSE_TIME_LIMIT - secondsResponding;
+
+                    SendAnswerCommand(client->GetIpAddress(), secondsRemaining, RESPONSE_TIME_LIMIT);
+                }
+
+                _lastRespondantPingTime = millis();
             }
 
-            _lastRespondantPingTime = millis();
-        }
-
-        // Responder ran out of time
-        if(timeResponding > RESPONSE_TIME_LIMIT)
-        {
-            auto client = GetClient(_currentRespondant);
-
-            if(client != 0)
+            // Responder ran out of time
+            if(millisResponding > (RESPONSE_TIME_LIMIT * 1000))
             {
-                SendResponseCommand(client->GetIpAddress(), false);
-            }
+                auto client = GetClient(_currentRespondant);
 
-            _currentRespondant.assign("");
-            _nextResponderDelayStartTime = millis();
+                if(client != 0)
+                {
+                    SendResponseCommand(client->GetIpAddress(), false);
+                }
+
+                _currentRespondant.assign("");
+                _nextResponderDelayStartTime = millis();
+            }
         }
     }
     else if(_currentRespondant.length() == 0 && !_responseQueue.IsEmpty() && _isAcceptingResponses == true)
@@ -317,8 +368,15 @@ void BuzzoController::UpdatePlaying()
             auto nextRespondantId = _responseQueue.DequeueNextResponse();
             auto client = GetClient(nextRespondantId);
 
+            Serial.print("Next respondant: ");
+            Serial.println(nextRespondantId.c_str());
+
+            Serial.print("Is respondant active? ");
+            Serial.println(client->IsActive() ? "YES" : "NO");
+
             if(client != 0 && client->IsActive())
             {
+                Serial.println("Answering");
                 _currentRespondant.assign(client->GetId());
                 _responseStartTime = millis();
 
@@ -392,13 +450,34 @@ ButtonClientInfo* BuzzoController::GetClient(std::string id)
 
     return 0;
 }
+
+int BuzzoController::GetActiveClientCount()
+{
+    int count = 0;
+
+    for(int i = 0; i < _clientCount; i++)
+    {
+        if(_clients[i]->IsActive())
+        {
+            count++;
+        }
+    }
+
+    return count;
+
+}
 #pragma endregion
 
 #pragma region Button Functions
 void BuzzoController::EndCurrentRespondantTurn(bool isCorrect)
 {
-    if(_currentState == BuzzoController::PLAYING)
+    _lastButtonPressTime = millis();
+
+    if(_currentState == BuzzoController::PLAYING && _isAcceptingResponses == true)
     {
+        Serial.print("Ending Turn - ");
+        Serial.println(isCorrect ? "CORRECT" : "INCORRECT");
+
         if(_currentRespondant.length() > 0)
         {
             auto client = GetClient(_currentRespondant);
@@ -407,9 +486,13 @@ void BuzzoController::EndCurrentRespondantTurn(bool isCorrect)
             {        
                 if(isCorrect)
                 {
-                    client->SetScore(client->GetScore() + 1);
+                    client->SetScore(min(MAX_SCORE, client->GetScore() + 1));
                     _isAcceptingResponses = false; // The round is over
                 }
+
+                Serial.print("Score: ");
+                Serial.println(client->GetScore());
+
 
                 SendScoreCommand(client->GetIpAddress(), client->GetScore());
                 SendResponseCommand(client->GetIpAddress(), isCorrect);
@@ -438,6 +521,8 @@ void BuzzoController::EndCurrentRespondantTurn(bool isCorrect)
 
 void BuzzoController::BeginResetButtonPress()
 {
+    _lastButtonPressTime = millis();
+
     if(_currentState == BuzzoController::PLAYING)
     {
         for(int i = 0; i < _clientCount; i++)

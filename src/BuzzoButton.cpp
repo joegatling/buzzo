@@ -11,7 +11,7 @@
 #include "BuzzoButton.h"
 #include "Commands.h"
 
-#define DEMO_MODE
+//#define DEMO_MODE
 
 float mapf(float x, float in_min, float in_max, float out_min, float out_max) 
 {
@@ -31,7 +31,6 @@ void IdleEnter(BuzzoButton* button)
 {
     // REMOVE THIS LATER
     button->_canBuzz = true;
-    button->_currentScore = 6;
 
     //TODO: Turn off the lights
     //TODO: Show current score
@@ -48,13 +47,23 @@ void IdleUpdate(BuzzoButton* button)
 
     #endif
 
-    if(button->_lastButtonPressTime > button->_stateEnterTime &&  millis() - button->_lastButtonPressTime < 200)
+    if(button->_wasScoreUpdated)
+    {
+        button->_stateEnterTime = millis();
+    }
+
+    auto timeInState = millis() - max(button->_stateEnterTime, button->_lastButtonPressTime);
+
+    const unsigned long fadeBegin = 3000;
+    const unsigned long fadeDuration = 1000;
+
+    if(timeInState < fadeBegin)
     {
         button->_strip.SetBrightness(255);
         button->_strip.ClearTo(RgbColor(255,255,255));
         button->_strip.Show();
     }
-    else
+    else if(timeInState < fadeBegin + fadeDuration)
     {
         if(button->_currentScore >= 6)
         {
@@ -69,18 +78,23 @@ void IdleUpdate(BuzzoButton* button)
         }
         else
         {
+
             button->_strip.SetBrightness(128);
 
             for(int i = 0; i < button->_strip.PixelCount(); i++)
             {
-                if(i < button->_currentScore)
-                {
-                    button->_strip.SetPixelColor(i, button->_wedgeColors[i]);                 
-                }
-                else
-                {
-                    button->_strip.SetPixelColor(i, RgbColor(0, 0, 0));
-                }
+                uint8_t targetBrightness = i < button->_currentScore ? 128 : 8;
+                uint8_t brightness = mapf((timeInState - fadeBegin) / (float)(fadeDuration), 0.0f, 1.0f, 255, targetBrightness);
+
+                button->_strip.SetBrightness(255);
+                button->_strip.SetPixelColor(i, RgbColor(brightness, brightness, brightness));
+                // if(i < button->_currentScore)
+                // {
+                //     button->_strip.SetPixelColor(i, button->_wedgeColors[0]);                 
+                // }
+                // else
+                // {
+                // }
             }
             button->_strip.Show();
         }
@@ -105,9 +119,11 @@ void AnsweringUpdate(BuzzoButton* button)
     const float pulseAmount = 64;
     float pulse = 255 - pulseAmount + sin(millis() / 100.0f) * pulseAmount;
 
+    int lightsToShow = ceil(button->_strip.PixelCount() *  ((float)button->_answeringTimeRemaining / (float)button->_answeringTotalTime));
+
     for(int i = 0; i < button->_strip.PixelCount(); i++)
     {
-        if(i < ceil(button->_answeringTimeRemaining / button->_answeringTotalTime))
+        if(i < lightsToShow)
         {
             button->_strip.SetPixelColor(i, RgbColor(pulse, pulse, 0));
         }
@@ -117,11 +133,18 @@ void AnsweringUpdate(BuzzoButton* button)
         }
     }
     
-    if(button->_answeringTimeRemaining < 10 && button->_hasStartedWarning == false)
+    if(button->_answeringTimeRemaining < 10)
     {
-        button->_hasStartedWarning = true;
-        button->_toneGenerator.StartTicking();
+        if(button->_hasStartedWarning == false)
+        {
+            button->_hasStartedWarning = true;
+            button->_toneGenerator.StartTicking();
+        }
+
+        button->_toneGenerator.SetTickingUrgency(1.0f - (button->_answeringTimeRemaining / 10.0f));
     }
+
+
 
     button->_strip.Show();
 }
@@ -154,6 +177,11 @@ void CorrectEnter(BuzzoButton* button)
 
 void CorrectUpdate(BuzzoButton* button)
 {
+    if(button->_wasScoreUpdated)
+    {
+        button->_stateEnterTime = millis();
+    }
+
     auto timeInState = millis() - max(button->_stateEnterTime, button->_lastButtonPressTime);
 
     const unsigned long fadeBegin = 3000;
@@ -224,6 +252,11 @@ void IncorrectEnter(BuzzoButton* button)
 
 void IncorrectUpdate(BuzzoButton* button)
 {
+    if(button->_wasScoreUpdated)
+    {
+        button->_stateEnterTime = millis();
+    }
+
     auto timeInState = millis() - max(button->_stateEnterTime, button->_lastButtonPressTime);
 
     const unsigned long fadeBegin = 3000;
@@ -370,14 +403,17 @@ void OnButtonHold(BuzzoButton* button)
 {
     button->DisableLights();
     button->SetState(BuzzoButton::NONE);
+    delay(100);
 }
 
 void OnButtonHoldRelease(BuzzoButton* button)
 {
+    WiFi.disconnect(true);
+        
     delay(100);
 
     esp_sleep_enable_ext0_wakeup(GPIO_NUM_32, LOW);
-    esp_deep_sleep_start();    
+    esp_deep_sleep_start();   
 }
 
 inline std::string trim(const std::string &s)
@@ -408,7 +444,8 @@ _lastButtonPressTime(0),
 _currentState(BuzzoButton::NONE),
 _nextState(BuzzoButton::NONE),
 _toneGenerator(),
-_hasConnected(false)
+_hasConnected(false),
+_wasScoreUpdated(false)
 {
     _strip.Begin();
     _strip.SetBrightness(50);
@@ -437,6 +474,7 @@ _hasConnected(false)
     _button.SetBeginPressCallback([]() { OnButtonPress(BuzzoButton::GetInstance()); });    
     _button.SetBeginHoldCallback([]() { OnButtonHold(BuzzoButton::GetInstance()); });    
     _button.SetEndHoldCallback([]() { OnButtonHoldRelease(BuzzoButton::GetInstance()); });    
+    _button.SetLongPressDuration(3000);
 
     udp.begin(PORT);
 
@@ -491,6 +529,8 @@ void BuzzoButton::Update()
             _lastSendTime = millis();
         }
     }
+
+    _wasScoreUpdated = false;
 }
 
 
@@ -523,10 +563,19 @@ void BuzzoButton::ProcessPacket()
             std::string params[2];
             int paramCount = 0;
 
+            Serial.println("Params:");
+
             while(data || paramCount >= sizeof(params))
             {
-                data >> params[paramCount++];
+                data >> params[paramCount];
+                
+                Serial.print(paramCount);
+                Serial.print(": ");
+                Serial.println(params[paramCount].c_str());
+
+                paramCount++;
             }
+
             // char command[LEN_COMMAND+1];
             // command[LEN_COMMAND] = 0;
 
@@ -545,12 +594,21 @@ void BuzzoButton::ProcessPacket()
 
             // Process Packet
             
+            Serial.print("Param Count: ");
+            Serial.println(paramCount);
+
             if(command.compare(COMMAND_ANSWER) == 0)
             {            
-                if(paramCount == 2)
+                if(paramCount >= 2)
                 {
                     int timeLeft = atoi(params[0].c_str());
                     int totalTime = atoi(params[1].c_str());
+
+                    Serial.print("Time Left: ");
+                    Serial.println(timeLeft);
+                    
+                    Serial.print("Total Time: ");
+                    Serial.println(totalTime);
 
                     // Some basic sanity checks
                     if(totalTime > 0 && timeLeft <= totalTime)
@@ -688,6 +746,7 @@ void BuzzoButton::ProcessSelectCommand()
 void BuzzoButton::ProcessScoreCommand(int score)
 {
     _currentScore = score;
+    _wasScoreUpdated = true;
 }
 
 

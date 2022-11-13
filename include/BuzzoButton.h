@@ -118,6 +118,7 @@ class BuzzoButton
         bool _hasStartedWarning;
 
         bool _isShowingScore;
+        bool _wasScoreUpdated;
 
         bool _hasConnected;
 

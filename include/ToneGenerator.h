@@ -27,6 +27,7 @@ class ToneGenerator
 
     void StartTicking();
     void StopTicking();
+    void SetTickingUrgency(float urgency);
 
     void Update();
 
@@ -39,6 +40,7 @@ class ToneGenerator
     unsigned long _lastTickTime = 0;
     bool _isTicking = false;
     bool _tock = false;
+    float _tickingUrgency;
 
     unsigned long _lastNoteTime = 0;
 

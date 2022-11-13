@@ -10,23 +10,22 @@
   IPAddress gateway(192,168,1,1);
   IPAddress subnet(255,255,255,0);  
 
+  #define DISCONNECTED_SLEEP_TIMER  (4 * 60 * 1000)
+  #define CONNECTED_SLEEP_TIMER     (20 * 60 * 1000)
+
 #else
 
   #include "BuzzoButton.h"
-
   #define DISCONNECTED_SLEEP_TIMER  (2 * 60 * 1000)
   #define CONNECTED_SLEEP_TIMER     (15 * 60 * 1000)
 
 #endif
 
+
 const char* ssid     = "Trivia Computer Access Point";
 const char* password = "123456789";
 
-#if BUZZO_CONTROLLER
-  #define LED_PIN LED_BUILTIN
-#else
-  #define LED_PIN 13
-#endif
+#define LED_PIN 13
 
 #define RANGE_START 39
 #define RANGE_END 40
@@ -38,11 +37,21 @@ unsigned long wakeTime = 0;
 
 void Sleep()
 {
-    BuzzoButton::GetInstance()->DisableLights();
+    #if BUZZO_BUTTON
+      BuzzoButton::GetInstance()->DisableLights();
+    #else
+      digitalWrite(LED_PIN, LOW);
+    #endif
 
     delay(100);
 
     esp_sleep_enable_ext0_wakeup(GPIO_NUM_32, LOW);
+
+    #if BUZZO_CONTROLLER
+      esp_sleep_enable_ext0_wakeup(GPIO_NUM_14, LOW);
+      esp_sleep_enable_ext0_wakeup(GPIO_NUM_15, LOW);
+    #endif    
+
     esp_deep_sleep_start();
 }
 
@@ -65,6 +74,9 @@ void setup()
     Serial.println(WiFi.softAPIP());
 
     BuzzoController::GetInstance()->Initialize();
+
+    pinMode(LED_PIN, OUTPUT);
+    digitalWrite(LED_PIN, HIGH);
 
   #elif BUZZO_BUTTON
 
@@ -90,6 +102,25 @@ void setup()
 void loop() 
 {
   BuzzoController::GetInstance()->Update(); 
+
+  unsigned long timeSinceWake = millis() - wakeTime;
+  unsigned long idleTime = min(timeSinceWake, BuzzoController::GetInstance()->TimeSinceLastButtonPress());
+
+  if(BuzzoController::GetInstance()->GetActiveClientCount() > 0)
+  {
+    if(idleTime > CONNECTED_SLEEP_TIMER)
+    {
+      Sleep();
+    }    
+  }
+  else
+  {
+    if(idleTime > DISCONNECTED_SLEEP_TIMER)
+    {
+      Sleep();
+    }
+  }  
+
 }
 
 #elif BUZZO_BUTTON

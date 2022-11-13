@@ -68,7 +68,13 @@ void ToneGenerator::DoSound(SoundId soundId, bool clearQueue)
     }
     else if(soundId == ToneGenerator::VICTORY)
     {
-        
+        EnqueueNote(NOTE_G4, 200);
+        EnqueueNote(NOTE_C5, 200);
+        EnqueueNote(NOTE_E5, 200);
+        EnqueueNote(NOTE_G5, 200);
+        EnqueueNote(NOTE_NONE, 100);
+        EnqueueNote(NOTE_E4, 100);
+        EnqueueNote(NOTE_G5, 400);
     }
     else if(soundId == ToneGenerator::RESPOND)
     {
@@ -79,11 +85,11 @@ void ToneGenerator::DoSound(SoundId soundId, bool clearQueue)
     }    
     else if(soundId == ToneGenerator::TICK)
     {
-        EnqueueNote(NOTE_E3, 50);
+        EnqueueNote(60 + (75 * _tickingUrgency), 50);
     }
     else if(soundId == ToneGenerator::TOCK)
     {
-        EnqueueNote(NOTE_E2, 50);
+        EnqueueNote(140 + (75 * _tickingUrgency), 50);
     }
 }
 
@@ -95,11 +101,25 @@ void ToneGenerator::StartTicking()
 
     _lastTickTime = millis();
     _isTicking = true;
-    _tock = false;
+    _tock = true;
 }
 void ToneGenerator::StopTicking()
 {
     _isTicking = false;
+}
+
+void ToneGenerator::SetTickingUrgency(float urgency)
+{
+    _tickingUrgency = urgency;
+
+    if(_tickingUrgency < 0)
+    {
+        _tickingUrgency = 0;
+    }
+    else if(_tickingUrgency > 1)
+    {
+        _tickingUrgency = 1;
+    }
 }
 
 void ToneGenerator::Update()

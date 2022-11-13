@@ -26,7 +26,7 @@ class ButtonClientInfo
         unsigned long GetTimeSinceLastContact();
         void ResetTimeSinceLastContact();
 
-        bool IsActive() { return GetTimeSinceLastContact() > LOST_CONTACT_TIME; }
+        bool IsActive() { return GetTimeSinceLastContact() < LOST_CONTACT_TIME; }
 
     private:
         IPAddress _ip;
