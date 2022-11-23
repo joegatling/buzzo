@@ -18,7 +18,8 @@ class ToneGenerator
         VICTORY,
         RESPOND,
         TICK,
-        TOCK
+        TOCK,
+        ACKNOWLEDGE
     };
 
     ToneGenerator();
@@ -30,10 +31,10 @@ class ToneGenerator
     void SetTickingUrgency(float urgency);
 
     void Update();
+    
+    void ClearSoundQueue();
 
     private:
-
-    void ClearSoundQueueu();
 
     void EnqueueNote(unsigned int note, unsigned int duration);
     

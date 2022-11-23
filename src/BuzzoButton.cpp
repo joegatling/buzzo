@@ -12,6 +12,7 @@
 #include "Commands.h"
 
 //#define DEMO_MODE
+#define FADEOUT_TIME 1500
 
 float mapf(float x, float in_min, float in_max, float out_min, float out_max) 
 {
@@ -49,12 +50,13 @@ void IdleUpdate(BuzzoButton* button)
 
     if(button->_wasScoreUpdated)
     {
-        button->_stateEnterTime = millis();
+        button->_lastButtonPressTime = millis();
+        Serial.println("Score was updated");
     }
 
     auto timeInState = millis() - max(button->_stateEnterTime, button->_lastButtonPressTime);
 
-    const unsigned long fadeBegin = 3000;
+    const unsigned long fadeBegin = FADEOUT_TIME;
     const unsigned long fadeDuration = 1000;
 
     if(timeInState < fadeBegin)
@@ -88,13 +90,6 @@ void IdleUpdate(BuzzoButton* button)
 
                 button->_strip.SetBrightness(255);
                 button->_strip.SetPixelColor(i, RgbColor(brightness, brightness, brightness));
-                // if(i < button->_currentScore)
-                // {
-                //     button->_strip.SetPixelColor(i, button->_wedgeColors[0]);                 
-                // }
-                // else
-                // {
-                // }
             }
             button->_strip.Show();
         }
@@ -179,12 +174,12 @@ void CorrectUpdate(BuzzoButton* button)
 {
     if(button->_wasScoreUpdated)
     {
-        button->_stateEnterTime = millis();
+        button->_lastButtonPressTime = millis();
     }
 
     auto timeInState = millis() - max(button->_stateEnterTime, button->_lastButtonPressTime);
 
-    const unsigned long fadeBegin = 3000;
+    const unsigned long fadeBegin = FADEOUT_TIME;
     const unsigned long fadeDuration = 1000;
 
     if(timeInState < fadeBegin)
@@ -254,12 +249,13 @@ void IncorrectUpdate(BuzzoButton* button)
 {
     if(button->_wasScoreUpdated)
     {
-        button->_stateEnterTime = millis();
+        button->_lastButtonPressTime = millis();
     }
+
 
     auto timeInState = millis() - max(button->_stateEnterTime, button->_lastButtonPressTime);
 
-    const unsigned long fadeBegin = 3000;
+    const unsigned long fadeBegin = FADEOUT_TIME;
     const unsigned long fadeDuration = 1000;
 
     if(timeInState < fadeBegin)
@@ -287,32 +283,24 @@ void IncorrectExit(BuzzoButton* button)
 
 
 void QueuedEnter(BuzzoButton* button)
-{
-    button->_strip.SetBrightness(255);
-    button->_placeInQueue = 1;
-}
+{}
 
 void QueuedUpdate(BuzzoButton* button)
 {
+    button->_strip.SetBrightness(255);
+    
     float offset = millis() / 2000.0f;
     offset = ((sin((offset + 0.5f)* TWO_PI) + (offset + 0.5f) * TWO_PI) / TWO_PI) - 0.5f;
 
     int count = button->_strip.PixelCount();
 
-    float colorA = 40000/0xFFFF;
-    float colorB = 45000/0xFFFF;
+    float colorA = 0.5f;
+    float colorB = 0.6f;
 
-    uint8_t patterns[3] = { 0b0000001, 0b00001001, 0b00000000 };
+    uint8_t patterns[4] = { 0b0000001, 0b00001001, 0b00010101, 0b00000000 };
 
     int patternIndex = constrain(button->_placeInQueue - 1, 0, sizeof(patterns) - 1);
     
-    // if(patternIndex > sizeof(patterns) - 1)
-    // {
-    //     patternIndex = sizeof(patterns) - 1;
-    // }
-
-    // Serial.print(patterns[button->_placeInQueue], BIN);
-    // Serial.print(" -> ");
     for(int i = 0; i < button->_strip.PixelCount(); i++)
     {
         float index = fmodf(offset + i, count);
@@ -331,14 +319,10 @@ void QueuedUpdate(BuzzoButton* button)
 
         float hue = mapf(f, 0.0f, 1.0f, colorB, colorA);
         float sat = 1.0f;
-        float val = (uint8_t)mapf(f, 0.0f, 1.0f, 0.1f, 0.5f);
+        float val = mapf(f, 0.0f, 1.0f, 0.1f, 0.5f);
 
-        auto color = HsbColor(hue,sat,val);
-        button->_strip.SetPixelColor(i, color);
+        button->_strip.SetPixelColor(i, HsbColor(hue,sat,val));
     }
-
-
-    //Serial.println("");
 
     button->_strip.Show();
 }
@@ -358,10 +342,14 @@ void DisconnectedEnter(BuzzoButton* button)
 
 void DisconnectedUpdate(BuzzoButton* button)
 {
+    button->_strip.SetBrightness(96);
+
+    float t = (sin(millis() / 500.0f) + 1.0f) / 2.0f;
+
     for(int i = 0; i < button->_strip.PixelCount(); i++)
     {
         bool isOn = ((millis() / 200) % button->_strip.PixelCount()) == i;
-        button->_strip.SetPixelColor(i, isOn ? RgbColor(64,64,64) : RgbColor(0,0,0));
+        button->_strip.SetPixelColor(i, isOn ? RgbColor::LinearBlend(RgbColor(255,0,0), RgbColor(255,255,255), t) : RgbColor(0,0,0));
     }    
     button->_strip.Show();
 }
@@ -392,7 +380,13 @@ void OnButtonPress(BuzzoButton* button)
         button->SendBuzzCommand();
     }
 
-    if(button->GetState() != BuzzoButton::DISCONNECTED)
+    bool shouldPlaySound = true;
+
+    //shouldPlaySound &= button->GetState() != BuzzoButton::DISCONNECTED;
+    shouldPlaySound &= button->GetState() == BuzzoButton::IDLE;
+    shouldPlaySound &= button->GetScore() < NUM_LED;
+
+    if(shouldPlaySound)
     {
         button->_toneGenerator.DoSound(ToneGenerator::BUZZ);
     }
@@ -401,7 +395,7 @@ void OnButtonPress(BuzzoButton* button)
 
 void OnButtonHold(BuzzoButton* button)
 {
-    button->DisableLights();
+    button->DisableLightsAndSound();
     button->SetState(BuzzoButton::NONE);
     delay(100);
 }
@@ -409,6 +403,7 @@ void OnButtonHold(BuzzoButton* button)
 void OnButtonHoldRelease(BuzzoButton* button)
 {
     WiFi.disconnect(true);
+    button->SetState(BuzzoButton::NONE);
         
     delay(100);
 
@@ -517,8 +512,10 @@ void BuzzoButton::Update()
         _states[_currentState]->Update(this);
     }
 
+    _wasScoreUpdated = false;
+
     //Serial.println("State Update End");
-    if(_currentState != BuzzoButton::DISCONNECTED)
+    if(_currentState != BuzzoButton::DISCONNECTED && _currentState != BuzzoButton::NONE)
     {
         ProcessPacket();
 
@@ -529,8 +526,6 @@ void BuzzoButton::Update()
             _lastSendTime = millis();
         }
     }
-
-    _wasScoreUpdated = false;
 }
 
 
@@ -539,16 +534,16 @@ void BuzzoButton::ProcessPacket()
     int packetSize = udp.parsePacket();
     if (packetSize) 
     {    
-        Serial.printf("Received packet of size %d from %s:%d\n \n", 
-        packetSize, 
-        udp.remoteIP().toString().c_str(), 
-        udp.remotePort());
+        // Serial.printf("Received packet of size %d from %s:%d\n \n", 
+        // packetSize, 
+        // udp.remoteIP().toString().c_str(), 
+        // udp.remotePort());
 
         // read the packet into packetBufffer
         int n = udp.read(packetBuffer, PACKET_MAX_SIZE);
         packetBuffer[n] = 0;
 
-        Serial.println("Contents:");
+        Serial.print("Received: ");
         Serial.println(packetBuffer); 
 
         std::stringstream data(packetBuffer);
@@ -563,10 +558,13 @@ void BuzzoButton::ProcessPacket()
             std::string params[2];
             int paramCount = 0;
 
-            Serial.println("Params:");
-
-            while(data || paramCount >= sizeof(params))
+            while(!data.eof() && paramCount < sizeof(params))
             {
+                if(paramCount == 0)
+                {
+                    Serial.println("Params:");
+                }
+
                 data >> params[paramCount];
                 
                 Serial.print(paramCount);
@@ -575,40 +573,13 @@ void BuzzoButton::ProcessPacket()
 
                 paramCount++;
             }
-
-            // char command[LEN_COMMAND+1];
-            // command[LEN_COMMAND] = 0;
-
-            // for(int i = 0; i < 3; i++)
-            // {
-            //     command[i] = packetBuffer[i];
-            // }
-
-            //std::string param;
-
-            // if(packetSize > 3)
-            // {
-            //     param.assign(command+3);
-            //     param = trim(param);
-            // }            
-
-            // Process Packet
             
-            Serial.print("Param Count: ");
-            Serial.println(paramCount);
-
             if(command.compare(COMMAND_ANSWER) == 0)
             {            
                 if(paramCount >= 2)
                 {
                     int timeLeft = atoi(params[0].c_str());
                     int totalTime = atoi(params[1].c_str());
-
-                    Serial.print("Time Left: ");
-                    Serial.println(timeLeft);
-                    
-                    Serial.print("Total Time: ");
-                    Serial.println(totalTime);
 
                     // Some basic sanity checks
                     if(totalTime > 0 && timeLeft <= totalTime)
@@ -666,14 +637,14 @@ void BuzzoButton::ProcessPacket()
                     error = true;
                 }
             }
-            else if(command.compare(COMMAND_OFF) == 0)
-            {
-                ProcessOffCommand();
-            }
             else if(command.compare(COMMAND_SELECT) == 0)
             {
                 ProcessSelectCommand();
-            }                                                                                                                          
+            }   
+            else if(command.compare(COMMAND_SLEEP) == 0)
+            {
+                ProcessSleepCommand();
+            }                                                                                                                                    
         }
         else
         {
@@ -698,10 +669,12 @@ BuzzoButton::StateId BuzzoButton::GetState()
     return _currentState;
 }
 
-void BuzzoButton::DisableLights()
+void BuzzoButton::DisableLightsAndSound()
 {
     _strip.ClearTo(RgbColor(0));
     _strip.Show();
+
+    _toneGenerator.ClearSoundQueue();
 }
 
 void BuzzoButton::ProcessAnswerCommand(int timeLeft, int totalTime)
@@ -733,11 +706,6 @@ void BuzzoButton::ProcessResetCommand(bool canBuzz)
     _canBuzz = canBuzz;
 }
 
-void BuzzoButton::ProcessOffCommand()
-{
-    // TOOD
-}
-
 void BuzzoButton::ProcessSelectCommand()
 {
     // TODO
@@ -749,13 +717,20 @@ void BuzzoButton::ProcessScoreCommand(int score)
     _wasScoreUpdated = true;
 }
 
+void BuzzoButton::ProcessSleepCommand()
+{
+    DisableLightsAndSound();
+    sleep(100);
+    OnButtonHoldRelease(this);
+}
+
 
 void BuzzoButton::SendRegisterCommand(char* param)
 {
     udp.beginPacket(_controllerIp, PORT);
     udp.print(COMMAND_REGISTER);
     udp.print(" ");
-    udp.println(param);
+    udp.print(param);
     udp.endPacket();
 
     

@@ -204,8 +204,6 @@
                 "/Users/joegatling/.platformio/packages/framework-arduinoespressif32/tools/sdk/esp32/qio_qspi/include",
                 "/Users/joegatling/.platformio/packages/framework-arduinoespressif32/cores/esp32",
                 "/Users/joegatling/.platformio/packages/framework-arduinoespressif32/variants/uPesy_esp32_wroom_devkit",
-                "/Users/joegatling/Documents/git/buzzo/.pio/libdeps/buzzo_controller/VerySimpleButton@1.0.0/include",
-                "/Users/joegatling/Documents/git/buzzo/.pio/libdeps/buzzo_controller/VerySimpleButton@1.0.0/src",
                 "/Users/joegatling/.platformio/packages/framework-arduinoespressif32/libraries/ArduinoOTA/src",
                 "/Users/joegatling/.platformio/packages/framework-arduinoespressif32/libraries/AsyncUDP/src",
                 "/Users/joegatling/.platformio/packages/framework-arduinoespressif32/libraries/BLE/src",
@@ -437,8 +435,6 @@
                     "/Users/joegatling/.platformio/packages/framework-arduinoespressif32/tools/sdk/esp32/qio_qspi/include",
                     "/Users/joegatling/.platformio/packages/framework-arduinoespressif32/cores/esp32",
                     "/Users/joegatling/.platformio/packages/framework-arduinoespressif32/variants/uPesy_esp32_wroom_devkit",
-                    "/Users/joegatling/Documents/git/buzzo/.pio/libdeps/buzzo_controller/VerySimpleButton@1.0.0/include",
-                    "/Users/joegatling/Documents/git/buzzo/.pio/libdeps/buzzo_controller/VerySimpleButton@1.0.0/src",
                     "/Users/joegatling/.platformio/packages/framework-arduinoespressif32/libraries/ArduinoOTA/src",
                     "/Users/joegatling/.platformio/packages/framework-arduinoespressif32/libraries/AsyncUDP/src",
                     "/Users/joegatling/.platformio/packages/framework-arduinoespressif32/libraries/BLE/src",
@@ -473,7 +469,7 @@
                 ]
             },
             "defines": [
-                "PLATFORMIO=60106",
+                "PLATFORMIO=60105",
                 "ARDUINO_uPesy_WROOM",
                 "BUZZO_CONTROLLER",
                 "HAVE_CONFIG_H",

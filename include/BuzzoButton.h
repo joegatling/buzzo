@@ -49,7 +49,7 @@ class BuzzoButton
 
         unsigned long TimeSinceLastButtonPress() { return millis() - _lastButtonPressTime; } 
 
-        void DisableLights();
+        void DisableLightsAndSound();
 
     private:
         static BuzzoButton* _instance;
@@ -62,9 +62,9 @@ class BuzzoButton
         void ProcessCorrectResponseCommand();
         void ProcessIncorrectResponseCommand();
         void ProcessResetCommand(bool canBuzz);
-        void ProcessOffCommand();
         void ProcessSelectCommand();
         void ProcessScoreCommand(int score);
+        void ProcessSleepCommand();
 
         void SendRegisterCommand(char* param);
         void SendBuzzCommand();

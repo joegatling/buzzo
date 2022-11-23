@@ -34,6 +34,9 @@ class BuzzoController
         void BeginIncorrectButtonPress();
         void BeginResetButtonPress();      
         void HoldResetButton();  
+        void ReleaseHoldResetButton();
+
+        void AdjustPreviousRespondant(bool isCorrect);
 
         unsigned long TimeSinceLastButtonPress() { return millis() - _lastButtonPressTime; } 
 
@@ -53,10 +56,10 @@ class BuzzoController
         void SendQueueCommand(IPAddress ip, int placeInQueue);
         void SendResponseCommand(IPAddress ip, bool isCorrect);
         void SendResetCommand(IPAddress ip, bool canBuzz);
-        void SendOffCommand(IPAddress ip);
         void SendSelectCommand(IPAddress ip);
         void SendErrorCommand(IPAddress ip, int errorCode);
         void SendScoreCommand(IPAddress ip, int score);
+        void SendSleepCommand(IPAddress ip);
 
         void UpdatePlaying();
         void UpdateSetup();
@@ -81,6 +84,8 @@ class BuzzoController
         unsigned long _lastButtonPressTime = 0;
 
         bool _isAcceptingResponses = true;
+        bool _isReset = false;
+        bool _shouldSleep = false;
 
         ControllerState _currentState = BuzzoController::PLAYING;
 
@@ -90,4 +95,6 @@ class BuzzoController
 
         ResponseQueue<std::string> _responseQueue;
         std::string _currentRespondant;
+        std::string _previousRespondant;
+        bool _previousRespondantWasCorrect = false;
 };

@@ -3,10 +3,6 @@
 
 #include <Wifi.h>
 
-#define MAX_RESPONSES 8
-#define GET_INDEX(i) ((_currentResponseIndex + i) % MAX_RESPONSES)
-
-
 template <class T>
 class ResponseQueue
 {
@@ -34,7 +30,7 @@ class ResponseQueue
     {
       for(int i = 0; i < _responseCount; i++)
       {
-        if(_responses[GET_INDEX(i)] == response)
+        if(_responses[GetIndex(i)] == response)
         {
           return true;
         }
@@ -43,6 +39,8 @@ class ResponseQueue
       return false;
     }    
 
+    /// @brief Removes the next response from the queue and returns it.
+    /// @return The next response, or NULL if the queue is empty
     T DequeueNextResponse()
     {
       if(IsEmpty())
@@ -53,19 +51,31 @@ class ResponseQueue
       T response = _responses[_currentResponseIndex];
 
       _responseCount--;
-      _currentResponseIndex = GET_INDEX(1);
+      _currentResponseIndex = GetIndex(1);
 
       return response;
     }   
 
+    /// @brief Adds a new response to the queue
     void EnqueueResponse(T response)
     {
-      if(_responseCount < MAX_RESPONSES)
+      if(_responseCount < _maxRespones)
       {
-        _responses[GET_INDEX(_responseCount)] = response;
+        _responses[GetIndex(_responseCount)] = response;
         _responseCount++;
       }
     }   
+
+    /// @brief Pushes a response to the front of the queue, so that it will be the next one dequeued
+    void PushResponse(T response)
+    {
+      if(_responseCount < _maxRespones)
+      {
+        _currentResponseIndex = GetIndex(_maxRespones-1);
+        _responses[_currentResponseIndex] = response;
+        _responseCount++;
+      }
+    }
 
     T PeekNextResponse(int index = 0)
     {
@@ -74,7 +84,7 @@ class ResponseQueue
         return {};
       }
 
-      return _responses[GET_INDEX(index)];
+      return _responses[GetIndex(index)];
     }    
 
     void Clear()
@@ -85,6 +95,11 @@ class ResponseQueue
     int GetResponseCount() { return _responseCount; }
 
   private:
+    unsigned int GetIndex(unsigned int i)
+    {
+      return (_currentResponseIndex + i) % _maxRespones;
+    }
+
     T* _responses;
     int _currentResponseIndex;
     int _responseCount;

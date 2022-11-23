@@ -2,6 +2,7 @@
 #include <Wifi.h>
 #include <Adafruit_NeoPixel.h>
 
+
 #if BUZZO_CONTROLLER
 
   #include "BuzzoController.h"
@@ -38,7 +39,7 @@ unsigned long wakeTime = 0;
 void Sleep()
 {
     #if BUZZO_BUTTON
-      BuzzoButton::GetInstance()->DisableLights();
+      BuzzoButton::GetInstance()->DisableLightsAndSound();
     #else
       digitalWrite(LED_PIN, LOW);
     #endif
@@ -68,10 +69,11 @@ void setup()
     Serial.println(WiFi.softAPConfig(local_IP, gateway, subnet) ? "Ready" : "Failed!");
 
     Serial.print("Setting soft-AP... ");
-    Serial.println(WiFi.softAP(ssid, password) ? "Ready" : "Failed!");
+    Serial.println(WiFi.softAP(ssid, password, 1, 0, 8) ? "Ready" : "Failed!");
 
     Serial.print("Soft-AP IP address = ");
     Serial.println(WiFi.softAPIP());
+
 
     BuzzoController::GetInstance()->Initialize();
 
@@ -121,6 +123,8 @@ void loop()
     }
   }  
 
+  //Serial.println(BuzzoController::GetInstance()->GetActiveClientCount());
+
 }
 
 #elif BUZZO_BUTTON
@@ -138,6 +142,7 @@ void loop()
       {
         Serial.println("Disconnected");
         isConnected = false;
+        wakeTime = millis();
         BuzzoButton::GetInstance()->SetState(BuzzoButton::DISCONNECTED);
       }
 
@@ -152,6 +157,7 @@ void loop()
       {
         Serial.println("Reconnected");
         isConnected = true;
+        wakeTime = millis();
         WiFi.setAutoReconnect(true);
 
         BuzzoButton::GetInstance()->SetState(BuzzoButton::IDLE);

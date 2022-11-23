@@ -13,7 +13,7 @@ void ToneGenerator::DoSound(SoundId soundId, bool clearQueue)
 {
     if(clearQueue)
     {
-        ClearSoundQueueu();
+        ClearSoundQueue();
     }
 
     if(soundId == ToneGenerator::BUZZ)
@@ -91,11 +91,16 @@ void ToneGenerator::DoSound(SoundId soundId, bool clearQueue)
     {
         EnqueueNote(140 + (75 * _tickingUrgency), 50);
     }
+    if(soundId == ToneGenerator::ACKNOWLEDGE)
+    {
+        EnqueueNote(NOTE_E2, 15);
+        EnqueueNote(NOTE_E4, 15);
+    }    
 }
 
 void ToneGenerator::StartTicking()
 {
-    ClearSoundQueueu();
+    ClearSoundQueue();
     
     DoSound(ToneGenerator::TICK, false);
 
@@ -164,7 +169,7 @@ void ToneGenerator::Update()
 
 }
 
-void ToneGenerator::ClearSoundQueueu()
+void ToneGenerator::ClearSoundQueue()
 {
     _soundQueueCount = 0;
     noTone(SPEAKER_PIN);
