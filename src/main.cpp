@@ -38,6 +38,8 @@ unsigned long wakeTime = 0;
 
 void Sleep()
 {
+    WiFi.disconnect(true);
+
     #if BUZZO_BUTTON
       BuzzoButton::GetInstance()->DisableLightsAndSound();
     #else

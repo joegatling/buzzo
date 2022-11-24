@@ -702,8 +702,21 @@ void BuzzoButton::ProcessIncorrectResponseCommand()
 
 void BuzzoButton::ProcessResetCommand(bool canBuzz)
 {
-    SetState(BuzzoButton::IDLE);
+    if(GetState() == BuzzoButton::IDLE)
+    {
+        _lastButtonPressTime = millis();
+    }
+    else
+    {
+        SetState(BuzzoButton::IDLE);
+    }
+    
     _canBuzz = canBuzz;
+
+    if(_canBuzz)
+    {
+        _toneGenerator.DoSound(ToneGenerator::ACKNOWLEDGE);
+    }
 }
 
 void BuzzoButton::ProcessSelectCommand()

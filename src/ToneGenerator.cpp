@@ -93,8 +93,8 @@ void ToneGenerator::DoSound(SoundId soundId, bool clearQueue)
     }
     if(soundId == ToneGenerator::ACKNOWLEDGE)
     {
-        EnqueueNote(NOTE_E2, 15);
-        EnqueueNote(NOTE_E4, 15);
+        EnqueueNote(NOTE_E2, 20);
+        EnqueueNote(NOTE_E3, 20);
     }    
 }
 
@@ -158,7 +158,7 @@ void ToneGenerator::Update()
 
         if(_currentNote != NOTE_NONE)
         {
-            tone(SPEAKER_PIN, _currentNote);
+            tone(SPEAKER_PIN, _currentNote, _currentDuration);
         }
         
         _soundQueueStart = (_soundQueueStart + 1) % MAX_SOUND_QUEUE;

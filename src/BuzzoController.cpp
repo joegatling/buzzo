@@ -43,6 +43,8 @@ _shouldSleep(false)
     _currentRespondant.assign("");
     _clientCount = 0;
     udp.begin(PORT);
+
+    _participantCount = 0;
 }
 
 void BuzzoController::Initialize()
@@ -239,6 +241,9 @@ void BuzzoController::ProcessBuzzCommand(IPAddress ip)
             if(!_responseQueue.ContainsResponse(client->GetId()))
             {
                 _responseQueue.EnqueueResponse(client->GetId());
+            
+                _participants[_participantCount] = client->GetId();
+                _participantCount++;
             }
 
             // If there is more than one in the response queue, tell this button that 
@@ -478,6 +483,68 @@ int BuzzoController::GetActiveClientCount()
     return count;
 
 }
+
+int BuzzoController::GetActiveClientsYetToPlayCount()
+{
+    int count = 0;
+
+    for(int i = 0; i < _clientCount; i++)
+    {
+
+        if(_clients[i]->IsActive())
+        {
+            bool hasParticipated = false;
+            
+            for(int j = 0; j < _participantCount; j++)
+            {
+                if(_participants[j].compare(_clients[i]->GetId()) == 0)
+                {
+                    hasParticipated = true;
+                    break;
+                }
+            }            
+
+            if(!hasParticipated)
+            {
+                count++;
+            }
+        }
+    }
+
+    return count;
+}
+
+void BuzzoController::AddAllRemainingClientsToQueue()
+{
+    for(int i = 0; i < _clientCount; i++)
+    {
+
+        if(_clients[i]->IsActive())
+        {
+            bool hasParticipated = false;
+            
+            for(int j = 0; j < _participantCount; j++)
+            {
+                if(_participants[j].compare(_clients[i]->GetId()) == 0)
+                {
+                    hasParticipated = true;
+                    break;
+                }
+            }            
+
+            if(!hasParticipated)
+            {
+                Serial.print("Adding client to response queue: ");
+                Serial.println(_clients[i]->GetId().c_str());
+                
+                // Pretend that this participant has buzzed
+                ProcessBuzzCommand(_clients[i]->GetIpAddress());
+            }
+        }
+    }
+}
+
+
 #pragma endregion
 
 #pragma region Button Functions
@@ -525,6 +592,19 @@ void BuzzoController::EndCurrentRespondantTurn(bool isCorrect)
             else
             {
                 _nextResponderDelayStartTime = millis();
+
+                if(_responseQueue.GetResponseCount() == 0)
+                {
+                    Serial.println("Response queue is empty");
+
+                    Serial.print("Clients yet to play: ");
+                    Serial.println(GetActiveClientsYetToPlayCount());
+                    
+                    if(GetActiveClientsYetToPlayCount() == 1)
+                    {
+                        AddAllRemainingClientsToQueue();
+                    }
+                }
             }
 
             _previousRespondant.assign(_currentRespondant);
@@ -544,7 +624,6 @@ void BuzzoController::BeginResetButtonPress()
         for(int i = 0; i < _clientCount; i++)
         {
             SendResetCommand(_clients[i]->GetIpAddress(), true);
-
         }
 
         _currentRespondant.assign("");
@@ -554,6 +633,8 @@ void BuzzoController::BeginResetButtonPress()
         _nextResponderDelayStartTime = 0;
 
         _responseQueue.Clear();
+
+        _participantCount = 0;
     }    
 }
 
@@ -566,10 +647,10 @@ void BuzzoController::HoldResetButton()
             _shouldSleep = true;
             digitalWrite(13, LOW);
 
-            // for(int i = 0; i < _clientCount; i++)
-            // {
-            //     SendSleepCommand(_clients[i]->GetIpAddress());
-            // }
+            for(int i = 0; i < _clientCount; i++)
+            {
+                SendSleepCommand(_clients[i]->GetIpAddress());
+            }
 
         }
         else

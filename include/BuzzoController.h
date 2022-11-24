@@ -41,6 +41,7 @@ class BuzzoController
         unsigned long TimeSinceLastButtonPress() { return millis() - _lastButtonPressTime; } 
 
         int GetActiveClientCount();
+        int GetActiveClientsYetToPlayCount();
 
     private:
         static BuzzoController* _instance;
@@ -63,6 +64,8 @@ class BuzzoController
 
         void UpdatePlaying();
         void UpdateSetup();
+
+        void AddAllRemainingClientsToQueue();
         
         void AddClient(ButtonClientInfo* newClient);
         void RemoveClientAt(unsigned int index);
@@ -97,4 +100,8 @@ class BuzzoController
         std::string _currentRespondant;
         std::string _previousRespondant;
         bool _previousRespondantWasCorrect = false;
+
+        std::string _participants[MAX_CLIENTS];
+        unsigned int _participantCount;
+
 };
