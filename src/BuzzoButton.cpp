@@ -367,6 +367,30 @@ void DisconnectedExit(BuzzoButton* button)
     button->_hasConnected = true;
 }
 
+void SelectedEnter(BuzzoButton* button)
+{
+    button->_toneGenerator.DoSound(ToneGenerator::ACKNOWLEDGE);
+    button->_canBuzz = true;
+}
+
+void SelectedUpdate(BuzzoButton* button)
+{
+    button->_strip.SetBrightness(96);
+
+    float t = (sin(millis() / 500.0f) + 1.0f) / 2.0f;
+
+    for(int i = 0; i < button->_strip.PixelCount(); i++)
+    {
+        bool isOn = i < button->_currentScore;
+        button->_strip.SetPixelColor(i, isOn ? RgbColor::LinearBlend(RgbColor(255,0,255), RgbColor(255,0,0), t) : RgbColor(64,0,64));
+    }    
+    button->_strip.Show();
+}
+
+void SelectedExit(BuzzoButton* button)
+{
+}
+
 
 #pragma endregion
 
@@ -464,6 +488,7 @@ _wasScoreUpdated(false)
     _states[CORRECT] = new BuzzoButtonState(&CorrectEnter, &CorrectUpdate, &CorrectExit);
     _states[INCORRECT] = new BuzzoButtonState(&IncorrectEnter, &IncorrectUpdate, &IncorrectExit);
     _states[QUEUED] = new BuzzoButtonState(&QueuedEnter, &QueuedUpdate, &QueuedExit);
+    _states[SELECTED] = new BuzzoButtonState(&SelectedEnter, &SelectedUpdate, &SelectedExit);
     _states[DISCONNECTED] = new BuzzoButtonState(&DisconnectedEnter, &DisconnectedUpdate, &DisconnectedExit);
 
     _button.SetBeginPressCallback([]() { OnButtonPress(BuzzoButton::GetInstance()); });    
@@ -721,7 +746,7 @@ void BuzzoButton::ProcessResetCommand(bool canBuzz)
 
 void BuzzoButton::ProcessSelectCommand()
 {
-    // TODO
+    SetState(BuzzoButton::SELECTED);
 }
 
 void BuzzoButton::ProcessScoreCommand(int score)

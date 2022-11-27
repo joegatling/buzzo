@@ -32,9 +32,10 @@ class BuzzoController
 
         void EndCurrentRespondantTurn(bool isCorrect);
         void BeginIncorrectButtonPress();
-        void BeginResetButtonPress();      
+        void ResetButtonPress();      
         void HoldResetButton();  
         void ReleaseHoldResetButton();
+        void ReleaseHoldIncorrectButton();
 
         void AdjustPreviousRespondant(bool isCorrect);
 
@@ -72,6 +73,8 @@ class BuzzoController
         ButtonClientInfo* GetClient(IPAddress ip);
         ButtonClientInfo* GetClient(std::string id);
 
+        
+
 
         ButtonClientInfo* _clients[MAX_CLIENTS];
         unsigned int _clientCount = 0;
@@ -86,9 +89,12 @@ class BuzzoController
         unsigned long _lastRespondantPingTime = 0;
         unsigned long _lastButtonPressTime = 0;
 
+        unsigned long _autoResestTime = 0;
+
         bool _isAcceptingResponses = true;
         bool _isReset = false;
         bool _shouldSleep = false;
+        bool _isInAdjustMode = false;
 
         ControllerState _currentState = BuzzoController::PLAYING;
 

@@ -32,6 +32,7 @@ class BuzzoButton
             CORRECT,
             INCORRECT,
             QUEUED,
+            SELECTED,
             DISCONNECTED,
             STATE_COUNT
         };
@@ -91,7 +92,11 @@ class BuzzoButton
 
         friend void DisconnectedEnter(BuzzoButton* button);
         friend void DisconnectedUpdate(BuzzoButton* button);
-        friend void DisconnectedExit(BuzzoButton* button);        
+        friend void DisconnectedExit(BuzzoButton* button);    
+
+        friend void SelectedEnter(BuzzoButton* button);
+        friend void SelectedUpdate(BuzzoButton* button);
+        friend void SelectedExit(BuzzoButton* button);      
 
         friend void OnButtonPress(BuzzoButton* button);
 

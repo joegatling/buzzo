@@ -10,6 +10,7 @@
 #define RESPONSE_TIME_LIMIT 60
 #define TIME_BETWEEN_RESPONDERS (1 * 1000)
 #define RESPONDANT_PING_TIME 500
+#define AUTO_RESET_TIME 15000
 
 #define MAX_SCORE 6
 
@@ -38,7 +39,8 @@ _resetButton(RESET_BUTTON_PIN),
 _responseQueue(MAX_CLIENTS),
 _isAcceptingResponses(true),
 _isReset(true),
-_shouldSleep(false)
+_shouldSleep(false),
+_isInAdjustMode(false)
 {
     _currentRespondant.assign("");
     _clientCount = 0;
@@ -55,9 +57,10 @@ void BuzzoController::Initialize()
 
     _incorrectButton.SetEndPressCallback([](){ BuzzoController::GetInstance()->EndCurrentRespondantTurn(false); });
     _incorrectButton.SetBeginHoldCallback([](){ BuzzoController::GetInstance()->AdjustPreviousRespondant(false); });
+    _incorrectButton.SetEndHoldCallback([](){ BuzzoController::GetInstance()->ReleaseHoldIncorrectButton(); });
     _incorrectButton.SetLongPressDuration(1500);
     
-    _resetButton.SetEndPressCallback([](){ BuzzoController::GetInstance()->BeginResetButtonPress(); });    
+    _resetButton.SetEndPressCallback([](){ BuzzoController::GetInstance()->ResetButtonPress(); });    
     _resetButton.SetBeginHoldCallback([](){ BuzzoController::GetInstance()->HoldResetButton(); });
     _resetButton.SetEndHoldCallback([](){ BuzzoController::GetInstance()->ReleaseHoldResetButton(); });
     _resetButton.SetLongPressDuration(3000);
@@ -232,30 +235,43 @@ void BuzzoController::ProcessBuzzCommand(IPAddress ip)
     Serial.print("Client ID ");
     Serial.println(client->GetId().c_str());    
 
+
     if(client != 0)
     {
-        client->ResetTimeSinceLastContact();
-
-        if(client->GetScore() < MAX_SCORE)
+        if(_isInAdjustMode)
         {
-            if(!_responseQueue.ContainsResponse(client->GetId()))
-            {
-                _responseQueue.EnqueueResponse(client->GetId());
-            
-                _participants[_participantCount] = client->GetId();
-                _participantCount++;
-            }
+            client->SetScore(max(0, client->GetScore() - 1));
+            Serial.print("Score: ");
+            Serial.println(client->GetScore());
 
-            // If there is more than one in the response queue, tell this button that 
-            // it needs to wait before it can respond.
-            if(_responseQueue.GetResponseCount() > 1 || _currentRespondant.length() > 0)
-            {
-                SendQueueCommand(ip, _responseQueue.GetResponseCount());
-            }
+            SendScoreCommand(client->GetIpAddress(), client->GetScore());
+        }
+        else
+        {
+            client->ResetTimeSinceLastContact();
 
-            // Note: A respondant will be selected in the next update, so all we need to here is enqueue
+            if(client->GetScore() < MAX_SCORE)
+            {
+                if(!_responseQueue.ContainsResponse(client->GetId()))
+                {
+                    _responseQueue.EnqueueResponse(client->GetId());
+                
+                    _participants[_participantCount] = client->GetId();
+                    _participantCount++;
+                }
+
+                // If there is more than one in the response queue, tell this button that 
+                // it needs to wait before it can respond.
+                if(_responseQueue.GetResponseCount() > 1 || _currentRespondant.length() > 0)
+                {
+                    SendQueueCommand(ip, _responseQueue.GetResponseCount());
+                }
+
+                // Note: A respondant will be selected in the next update, so all we need to here is enqueue
+            }
         }
     }
+    
 
     _isReset = false;
 }
@@ -376,44 +392,54 @@ void BuzzoController::UpdatePlaying()
             }
         }
     }
-    else if(_currentRespondant.length() == 0 && !_responseQueue.IsEmpty() && _isAcceptingResponses == true)
+    else if(_currentRespondant.length() == 0)
     {
-        // Wait a short delay between respondants to increase gameplay tension
-        if(millis() - _nextResponderDelayStartTime > TIME_BETWEEN_RESPONDERS)
+        if(!_responseQueue.IsEmpty() && _isAcceptingResponses == true)
         {
-            // Find our next respondant
-            auto nextRespondantId = _responseQueue.DequeueNextResponse();
-            auto client = GetClient(nextRespondantId);
-
-            Serial.print("Next respondant: ");
-            Serial.println(nextRespondantId.c_str());
-
-            Serial.print("Is respondant active? ");
-            Serial.println(client->IsActive() ? "YES" : "NO");
-
-            if(client != 0 && client->IsActive())
+            // Wait a short delay between respondants to increase gameplay tension
+            if(millis() - _nextResponderDelayStartTime > TIME_BETWEEN_RESPONDERS)
             {
-                Serial.println("Answering");
-                _currentRespondant.assign(client->GetId());
-                _responseStartTime = millis();
+                // Find our next respondant
+                auto nextRespondantId = _responseQueue.DequeueNextResponse();
+                auto client = GetClient(nextRespondantId);
 
-                SendAnswerCommand(client->GetIpAddress(), RESPONSE_TIME_LIMIT, RESPONSE_TIME_LIMIT);
-                _lastRespondantPingTime = millis();
-            }
+                Serial.print("Next respondant: ");
+                Serial.println(nextRespondantId.c_str());
 
-            // Tell all other buttons that they're in the queue
-            int placeInQueue = 0;
-            for(int i = 0; i < _responseQueue.GetResponseCount(); i++)
-            {
-                client = GetClient(_responseQueue.PeekNextResponse(i));
+                Serial.print("Is respondant active? ");
+                Serial.println(client->IsActive() ? "YES" : "NO");
+
                 if(client != 0 && client->IsActive())
                 {
-                    placeInQueue++;
-                    SendQueueCommand(client->GetIpAddress(), placeInQueue);
+                    Serial.println("Answering");
+                    _currentRespondant.assign(client->GetId());
+                    _responseStartTime = millis();
+
+                    SendAnswerCommand(client->GetIpAddress(), RESPONSE_TIME_LIMIT, RESPONSE_TIME_LIMIT);
+                    _lastRespondantPingTime = millis();
+                }
+
+                // Tell all other buttons that they're in the queue
+                int placeInQueue = 0;
+                for(int i = 0; i < _responseQueue.GetResponseCount(); i++)
+                {
+                    client = GetClient(_responseQueue.PeekNextResponse(i));
+                    if(client != 0 && client->IsActive())
+                    {
+                        placeInQueue++;
+                        SendQueueCommand(client->GetIpAddress(), placeInQueue);
+                    }
                 }
             }
         }
-    }    
+        else if(_isAcceptingResponses == false)
+        {
+            if(_autoResestTime > 0 && millis() > _autoResestTime)
+            {
+                ResetButtonPress();
+            }
+        }
+    } 
 }
 
 void BuzzoController::UpdateSetup()
@@ -579,6 +605,7 @@ void BuzzoController::EndCurrentRespondantTurn(bool isCorrect)
             if(isCorrect)
             {
                 _isAcceptingResponses = false;
+                _autoResestTime = millis() + AUTO_RESET_TIME;
             
                 // for(int i = 0; i < _responseQueue.GetResponseCount(); i++)
                 // {
@@ -615,7 +642,7 @@ void BuzzoController::EndCurrentRespondantTurn(bool isCorrect)
     }
 }
 
-void BuzzoController::BeginResetButtonPress()
+void BuzzoController::ResetButtonPress()
 {
     _lastButtonPressTime = millis();
 
@@ -635,6 +662,8 @@ void BuzzoController::BeginResetButtonPress()
         _responseQueue.Clear();
 
         _participantCount = 0;
+        
+        _autoResestTime = 0;
     }    
 }
 
@@ -756,6 +785,25 @@ void BuzzoController::AdjustPreviousRespondant(bool isCorrect)
             _previousRespondantWasCorrect = isCorrect;
             _isAcceptingResponses = !isCorrect;
         }
+    }
+    else
+    {
+        _isInAdjustMode = true;
+
+        for(int i = 0; i < _clientCount; i++)
+        {
+            SendSelectCommand(_clients[i]->GetIpAddress());
+        }
+    }
+}
+
+void BuzzoController::ReleaseHoldIncorrectButton()
+{
+    _isInAdjustMode = false;
+
+    for(int i = 0; i < _clientCount; i++)
+    {
+        SendResetCommand(_clients[i]->GetIpAddress(), true);
     }
 }
 #pragma endregion
