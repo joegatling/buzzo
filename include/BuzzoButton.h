@@ -42,6 +42,8 @@ class BuzzoButton
         void Initialize();
         void Update();
 
+        void SetBatteryLevel(float level) { _batteryLevel = level; }
+
         StateId GetState();
         void SetState(StateId newState);
 
@@ -49,6 +51,8 @@ class BuzzoButton
         int GetPlaceInQueue() { return _placeInQueue; }
 
         unsigned long TimeSinceLastButtonPress() { return millis() - _lastButtonPressTime; } 
+
+        void ShowBatteryLevelOnButton();
 
         void DisableLightsAndSound();
 
@@ -119,6 +123,7 @@ class BuzzoButton
         int _answeringTimeRemaining;
         int _answeringTotalTime;        
         int _placeInQueue;
+        bool _isAnswerTimePaused;
 
         bool _hasStartedWarning;
 
@@ -131,6 +136,9 @@ class BuzzoButton
         unsigned long _lastButtonPressTime;
 
         bool _canBuzz;
+
+        float _batteryLevel;
+        bool _isBlinking; 
 
         RgbColor _wedgeColors[7];
 

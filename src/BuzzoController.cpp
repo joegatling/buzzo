@@ -7,10 +7,10 @@
 #include "BuzzoController.h"
 #include "Commands.h"
 
-#define RESPONSE_TIME_LIMIT 60
+#define RESPONSE_TIME_LIMIT     20
 #define TIME_BETWEEN_RESPONDERS (1 * 1000)
-#define RESPONDANT_PING_TIME 500
-#define AUTO_RESET_TIME 15000
+#define RESPONDANT_PING_TIME    500
+#define AUTO_RESET_TIME         5000
 
 #define MAX_SCORE 6
 
@@ -36,10 +36,12 @@ BuzzoController::BuzzoController():
 _correctButton(CORRECT_BUTTON_PIN),
 _incorrectButton(INCORRECT_BUTTON_PIN),
 _resetButton(RESET_BUTTON_PIN),
+_pauseButton(PAUSE_BUTTON_PIN),
 _responseQueue(MAX_CLIENTS),
 _isAcceptingResponses(true),
 _isReset(true),
 _shouldSleep(false),
+_isPaused(false),
 _isInAdjustMode(false)
 {
     _currentRespondant.assign("");
@@ -47,6 +49,8 @@ _isInAdjustMode(false)
     udp.begin(PORT);
 
     _participantCount = 0;
+
+    _lastMillis = millis();
 }
 
 void BuzzoController::Initialize()
@@ -64,6 +68,9 @@ void BuzzoController::Initialize()
     _resetButton.SetBeginHoldCallback([](){ BuzzoController::GetInstance()->HoldResetButton(); });
     _resetButton.SetEndHoldCallback([](){ BuzzoController::GetInstance()->ReleaseHoldResetButton(); });
     _resetButton.SetLongPressDuration(3000);
+
+    _pauseButton.SetBeginPressCallback([](){ BuzzoController::GetInstance()->BeginPauseButtonPress(); });
+    _pauseButton.SetEndPressCallback([](){ BuzzoController::GetInstance()->EndPauseButtonPress(); });
 }
 
 void BuzzoController::Update()
@@ -73,6 +80,7 @@ void BuzzoController::Update()
     _correctButton.Update();
     _incorrectButton.Update();
     _resetButton.Update();
+    _pauseButton.Update();
 
     if(_currentState == BuzzoController::PLAYING)
     {
@@ -82,6 +90,8 @@ void BuzzoController::Update()
     {
         UpdateSetup();
     }
+
+    _lastMillis = millis();    
 }
 
 #pragma region Command Processing
@@ -182,6 +192,9 @@ void BuzzoController::ProcessRegisterCommand(IPAddress ip, std::string param)
                     RemoveClientAt(j);                    
                 }
             }
+
+            // Tell the client what it's current score is
+            SendScoreCommand(ip, _clients[i]->GetScore());
 
             return;
         } 
@@ -354,7 +367,12 @@ void BuzzoController::UpdatePlaying()
     {
         if(_isAcceptingResponses) // If this is false, we have already received the correct answer
         {
-            unsigned long millisResponding = millis() - _responseStartTime;
+            if(_isPaused)
+            {
+                _responsePauseTime += millis() - _lastMillis;
+            }
+
+            unsigned long millisResponding = millis() - _responseStartTime - _responsePauseTime;
             int secondsResponding = floor(millisResponding / 1000);            
 
             // Update respondant timer
@@ -366,8 +384,13 @@ void BuzzoController::UpdatePlaying()
                 auto client = GetClient(_currentRespondant);
 
                 if(client != 0)
-                {
+                {                    
                     int secondsRemaining = RESPONSE_TIME_LIMIT - secondsResponding;
+
+                    if(_isPaused)
+                    {
+                        secondsRemaining = -secondsRemaining;
+                    }
 
                     SendAnswerCommand(client->GetIpAddress(), secondsRemaining, RESPONSE_TIME_LIMIT);
                 }
@@ -388,6 +411,7 @@ void BuzzoController::UpdatePlaying()
                 _previousRespondant.assign(_currentRespondant);
                 _currentRespondant.assign("");
 
+                _responsePauseTime = 0;
                 _nextResponderDelayStartTime = millis();
             }
         }
@@ -414,6 +438,7 @@ void BuzzoController::UpdatePlaying()
                     Serial.println("Answering");
                     _currentRespondant.assign(client->GetId());
                     _responseStartTime = millis();
+                    _responsePauseTime = 0;
 
                     SendAnswerCommand(client->GetIpAddress(), RESPONSE_TIME_LIMIT, RESPONSE_TIME_LIMIT);
                     _lastRespondantPingTime = millis();
@@ -711,9 +736,9 @@ void BuzzoController::ReleaseHoldResetButton()
 
         WiFi.disconnect(true);
 
-        esp_sleep_enable_ext0_wakeup(GPIO_NUM_32, LOW);
+        // esp_sleep_enable_ext0_wakeup(GPIO_NUM_32, LOW);
+        // esp_sleep_enable_ext0_wakeup(GPIO_NUM_15, LOW);    
         esp_sleep_enable_ext0_wakeup(GPIO_NUM_14, LOW);
-        esp_sleep_enable_ext0_wakeup(GPIO_NUM_15, LOW);    
 
         esp_deep_sleep_start();  
     } 
@@ -786,15 +811,15 @@ void BuzzoController::AdjustPreviousRespondant(bool isCorrect)
             _isAcceptingResponses = !isCorrect;
         }
     }
-    else
-    {
-        _isInAdjustMode = true;
+    // else
+    // {
+    //     _isInAdjustMode = true;
 
-        for(int i = 0; i < _clientCount; i++)
-        {
-            SendSelectCommand(_clients[i]->GetIpAddress());
-        }
-    }
+    //     for(int i = 0; i < _clientCount; i++)
+    //     {
+    //         SendSelectCommand(_clients[i]->GetIpAddress());
+    //     }
+    // }
 }
 
 void BuzzoController::ReleaseHoldIncorrectButton()
@@ -805,5 +830,17 @@ void BuzzoController::ReleaseHoldIncorrectButton()
     {
         SendResetCommand(_clients[i]->GetIpAddress(), true);
     }
+}
+
+void BuzzoController::BeginPauseButtonPress()
+{
+    Serial.println("PAUSE");
+    _isPaused = true;
+}
+
+void BuzzoController::EndPauseButtonPress()
+{
+    Serial.println("UNPAUSE");
+        _isPaused = false;
 }
 #pragma endregion

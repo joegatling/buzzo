@@ -94,6 +94,23 @@ void IdleUpdate(BuzzoButton* button)
             button->_strip.Show();
         }
     }
+    else
+    {
+        if(button->_batteryLevel < 5.0f || button->_isBlinking)
+        {
+            button->_isBlinking = ((millis()) % 3000) < 300;
+
+            button->_strip.SetBrightness(255);
+
+            for(int i = 0; i < button->_strip.PixelCount(); i++)
+            {
+                uint8_t targetBrightness = i < button->_currentScore ? 128 : 8;
+                button->_strip.SetPixelColor(i, RgbColor(targetBrightness, button->_isBlinking ? 0 : targetBrightness, button->_isBlinking ? 0 : targetBrightness));
+            }
+            button->_strip.Show();                
+        }
+    }
+
 }
 
 void IdleExit(BuzzoButton* button)
@@ -114,13 +131,18 @@ void AnsweringUpdate(BuzzoButton* button)
     const float pulseAmount = 64;
     float pulse = 255 - pulseAmount + sin(millis() / 100.0f) * pulseAmount;
 
+    if(button->_isAnswerTimePaused)
+    {
+        pulse = 255 - (pulseAmount * 2);
+    }
+
     int lightsToShow = ceil(button->_strip.PixelCount() *  ((float)button->_answeringTimeRemaining / (float)button->_answeringTotalTime));
 
     for(int i = 0; i < button->_strip.PixelCount(); i++)
     {
         if(i < lightsToShow)
         {
-            button->_strip.SetPixelColor(i, RgbColor(pulse, pulse, 0));
+            button->_strip.SetPixelColor(i, RgbColor(pulse, button->_isAnswerTimePaused ? pulse / 2 : pulse, 0));
         }
         else
         {
@@ -130,10 +152,22 @@ void AnsweringUpdate(BuzzoButton* button)
     
     if(button->_answeringTimeRemaining < 10)
     {
-        if(button->_hasStartedWarning == false)
+        if(button->_isAnswerTimePaused)
         {
-            button->_hasStartedWarning = true;
-            button->_toneGenerator.StartTicking();
+            if(button->_hasStartedWarning == true)
+            {
+                button->_hasStartedWarning = false;
+                button->_toneGenerator.StopTicking();
+            }
+            
+        }
+        else
+        {
+            if(button->_hasStartedWarning == false)
+            {
+                button->_hasStartedWarning = true;
+                button->_toneGenerator.StartTicking();
+            }
         }
 
         button->_toneGenerator.SetTickingUrgency(1.0f - (button->_answeringTimeRemaining / 10.0f));
@@ -457,6 +491,8 @@ BuzzoButton::BuzzoButton() :
 _controllerIp(192,168,1,1),
 _currentScore(0),
 _canBuzz(false),
+_batteryLevel(100),
+_isBlinking(false),
 _button(BUZZER_BUTTON_PIN),
 _strip(6, NEOPIXEL_PIN),
 _lastButtonPressTime(0),
@@ -464,7 +500,8 @@ _currentState(BuzzoButton::NONE),
 _nextState(BuzzoButton::NONE),
 _toneGenerator(),
 _hasConnected(false),
-_wasScoreUpdated(false)
+_wasScoreUpdated(false),
+_isAnswerTimePaused(false)
 {
     _strip.Begin();
     _strip.SetBrightness(50);
@@ -702,11 +739,35 @@ void BuzzoButton::DisableLightsAndSound()
     _toneGenerator.ClearSoundQueue();
 }
 
+void BuzzoButton::ShowBatteryLevelOnButton()
+{
+    Serial.print("Battery Level: ");
+    Serial.println(_batteryLevel);
+
+    float increment = 100.0f / _strip.PixelCount();
+
+    _strip.ClearTo(RgbColor(0));
+    for(int i = 0; i < _strip.PixelCount(); i++)
+    {
+        if(_batteryLevel > (i * increment))
+        {
+            _strip.SetPixelColor(i, RgbColor(0, 255, 255));
+        }
+        else
+        {
+            break;
+        }
+    }
+    _strip.Show();
+}
+
 void BuzzoButton::ProcessAnswerCommand(int timeLeft, int totalTime)
 {
     SetState(BuzzoButton::ANSWERING);
-    _answeringTimeRemaining = timeLeft;
+    _answeringTimeRemaining = abs(timeLeft);
     _answeringTotalTime = totalTime;
+    _isAnswerTimePaused = timeLeft < 0;
+
 }
 
 void BuzzoButton::ProcessQueueCommand(int placeInQueue)
@@ -751,8 +812,11 @@ void BuzzoButton::ProcessSelectCommand()
 
 void BuzzoButton::ProcessScoreCommand(int score)
 {
-    _currentScore = score;
-    _wasScoreUpdated = true;
+    if(_currentScore != score)
+    {
+        _currentScore = score;
+        _wasScoreUpdated = true;
+    }
 }
 
 void BuzzoButton::ProcessSleepCommand()

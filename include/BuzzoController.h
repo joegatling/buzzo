@@ -12,9 +12,22 @@
 
 #define PORT 8888
 
-#define CORRECT_BUTTON_PIN 32
-#define INCORRECT_BUTTON_PIN 14
-#define RESET_BUTTON_PIN 15
+
+#ifdef NEW_PINS
+    // WHITE
+    #define PAUSE_BUTTON_PIN 33
+    // GREY
+    #define CORRECT_BUTTON_PIN 15
+    // PURPLE
+    #define INCORRECT_BUTTON_PIN 32
+    // BLUE
+    #define RESET_BUTTON_PIN 14
+#else
+    #define PAUSE_BUTTON_PIN 33
+    #define CORRECT_BUTTON_PIN 32
+    #define INCORRECT_BUTTON_PIN 14
+    #define RESET_BUTTON_PIN 15
+#endif
 
 class BuzzoController
 {
@@ -36,6 +49,9 @@ class BuzzoController
         void HoldResetButton();  
         void ReleaseHoldResetButton();
         void ReleaseHoldIncorrectButton();
+
+        void BeginPauseButtonPress();
+        void EndPauseButtonPress();
 
         void AdjustPreviousRespondant(bool isCorrect);
 
@@ -88,6 +104,8 @@ class BuzzoController
         unsigned long _nextResponderDelayStartTime = 0;
         unsigned long _lastRespondantPingTime = 0;
         unsigned long _lastButtonPressTime = 0;
+        unsigned long _responsePauseTime = 0;
+        unsigned long _lastMillis = 0;
 
         unsigned long _autoResestTime = 0;
 
@@ -95,12 +113,14 @@ class BuzzoController
         bool _isReset = false;
         bool _shouldSleep = false;
         bool _isInAdjustMode = false;
+        bool _isPaused = false;
 
         ControllerState _currentState = BuzzoController::PLAYING;
 
         SimpleButton _correctButton;
         SimpleButton _incorrectButton;
         SimpleButton _resetButton;
+        SimpleButton _pauseButton;
 
         ResponseQueue<std::string> _responseQueue;
         std::string _currentRespondant;

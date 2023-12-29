@@ -4,3 +4,4 @@
 .gcc-flags.json
 .pio
 .DS_Store
+.vscode/
