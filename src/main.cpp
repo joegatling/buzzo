@@ -101,7 +101,7 @@ void setup()
     Serial.println(WiFi.softAPConfig(local_IP, gateway, subnet) ? "Ready" : "Failed!");
 
     Serial.print("Setting soft-AP... ");
-    Serial.println(WiFi.softAP(ssid, password, 1, 0, 8) ? "Ready" : "Failed!");
+    Serial.println(WiFi.softAP(ssid, password, 1, 0, 9) ? "Ready" : "Failed!");
 
     Serial.print("Soft-AP IP address = ");
     Serial.println(WiFi.softAPIP());
