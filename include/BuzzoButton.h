@@ -2,7 +2,7 @@
 
 #include <WiFiudp.h>
 //#include <Adafruit_NeoPixel.h>
-#include <NeoPixelBrightnessBus.h>
+#include <NeoPixelBusLg.h>
 #include <SimpleButton.h>
 
 #include "BuzzoButtonState.h"
@@ -71,8 +71,9 @@ class BuzzoButton
         void ProcessScoreCommand(int score);
         void ProcessSleepCommand();
 
-        void SendRegisterCommand(char* param);
+        void SendRegisterCommand(char* id, unsigned int battery);
         void SendBuzzCommand();
+        void SendBatteryUpdate();
 
         friend void IdleEnter(BuzzoButton* button);
         friend void IdleUpdate(BuzzoButton* button);
@@ -137,13 +138,13 @@ class BuzzoButton
 
         bool _canBuzz;
 
-        float _batteryLevel;
+        unsigned int _batteryLevel;
         bool _isBlinking; 
 
         RgbColor _wedgeColors[7];
 
         //Adafruit_NeoPixel _strip;
-        NeoPixelBrightnessBus<NeoGrbFeature, Neo800KbpsMethod> _strip;
+        NeoPixelBusLg<NeoGrbFeature, Neo800KbpsMethod> _strip;
 
         ToneGenerator _toneGenerator;
 

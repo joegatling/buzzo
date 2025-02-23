@@ -60,6 +60,8 @@ class BuzzoController
         int GetActiveClientCount();
         int GetActiveClientsYetToPlayCount();
 
+        unsigned int GetMinBatteryLevelForClients();
+
     private:
         static BuzzoController* _instance;
 
@@ -67,7 +69,7 @@ class BuzzoController
 
         void ProcessPacket();
 
-        void ProcessRegisterCommand(IPAddress ip, std::string param);
+        void ProcessRegisterCommand(IPAddress ip, std::string paramId, std::string paramBattery);
         void ProcessBuzzCommand(IPAddress ip);
 
         void SendAnswerCommand(IPAddress ip, int timer, int totalTime);

@@ -128,6 +128,11 @@ void BuzzoController::ProcessPacket()
             while(data || paramCount >= sizeof(params))
             {
                 data >> params[paramCount++];
+                // Serial.print("Param ");
+                // Serial.print(paramCount - 1);
+                // Serial.print(" [");
+                // Serial.print(params[paramCount - 1].c_str());
+                // Serial.println("]");
             }            
 
             // Process Packet
@@ -139,13 +144,20 @@ void BuzzoController::ProcessPacket()
             {
                 if(paramCount > 0)
                 {
-                    ProcessRegisterCommand(udp.remoteIP(), params[0]);                    
+                    if(params[1].length() > 0)
+                    {
+                        ProcessRegisterCommand(udp.remoteIP(), params[0], params[1]);
+                    }
+                    else
+                    {
+                        ProcessRegisterCommand(udp.remoteIP(), params[0], "100");
+                    }
                 }
                 else
                 {
                     error = true;
                 }
-            }    
+            }                            
             else
             {
                 error = true;
@@ -163,20 +175,27 @@ void BuzzoController::ProcessPacket()
     }
 }
 
-void BuzzoController::ProcessRegisterCommand(IPAddress ip, std::string param)
+void BuzzoController::ProcessRegisterCommand(IPAddress ip, std::string paramId, std::string paramBattery)
 {
     Serial.println("Registering Client");
     Serial.print("ID ");
-    Serial.println(param.c_str());
+    Serial.println(paramId.c_str());
+
+    Serial.print("Battery ");
+    Serial.print(paramBattery.c_str());
+    Serial.println("%");
 
     for(int i = 0; i < _clientCount; i++)
     {
-        if(_clients[i]->GetId().compare(param) == 0)
+        if(_clients[i]->GetId().compare(paramId) == 0)
         {
             Serial.println("Resetting Contact Time...");
             _clients[i]->ResetTimeSinceLastContact();
 
-            Serial.println(_clients[i]->GetTimeSinceLastContact());
+            int batteryLevel = atoi(paramBattery.c_str());
+            _clients[i]->SetBatteryLevel(batteryLevel);
+
+            //Serial.println(_clients[i]->GetTimeSinceLastContact());
 
             // An entry with a different IP is associated with this ID. This
             // means the button has been assigned a new IP.
@@ -205,8 +224,12 @@ void BuzzoController::ProcessRegisterCommand(IPAddress ip, std::string param)
             // If this IP is to be associated with a new ID, then this must
             // be an entirely new Button, so reset the score too.
 
-            _clients[i]->SetId(param);
+            
+            _clients[i]->SetId(paramId);
             _clients[i]->SetScore(0);
+
+            int batteryLevel = atoi(paramBattery.c_str());
+            _clients[i]->SetBatteryLevel(batteryLevel);            
 
             return;
         }  
@@ -229,8 +252,12 @@ void BuzzoController::ProcessRegisterCommand(IPAddress ip, std::string param)
     // Add this client (if we can)
     if(_clientCount < MAX_CLIENTS)
     {
-        ButtonClientInfo* newClient = new ButtonClientInfo(ip, param);
+        ButtonClientInfo* newClient = new ButtonClientInfo(ip, paramId);
         AddClient(newClient);
+
+        int batteryLevel = atoi(paramBattery.c_str());
+        newClient->SetBatteryLevel(batteryLevel);            
+
     }
     else
     {
@@ -245,12 +272,13 @@ void BuzzoController::ProcessBuzzCommand(IPAddress ip)
 
     auto client = GetClient(ip);
 
-    Serial.print("Client ID ");
-    Serial.println(client->GetId().c_str());    
 
 
     if(client != 0)
     {
+        Serial.print("Client ID ");
+        Serial.println(client->GetId().c_str());    
+
         if(_isInAdjustMode)
         {
             client->SetScore(max(0, client->GetScore() - 1));
@@ -563,6 +591,21 @@ int BuzzoController::GetActiveClientsYetToPlayCount()
     }
 
     return count;
+}
+
+unsigned int BuzzoController::GetMinBatteryLevelForClients()
+{
+    unsigned int minBatteryLevel = 100;
+
+    for(int i = 0; i < _clientCount; i++)
+    {
+        if(_clients[i]->IsActive())
+        {
+            minBatteryLevel = min(minBatteryLevel, _clients[i]->GetBatteryLevel());
+        }
+    }
+
+    return minBatteryLevel;
 }
 
 void BuzzoController::AddAllRemainingClientsToQueue()

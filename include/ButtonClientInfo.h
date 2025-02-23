@@ -28,10 +28,15 @@ class ButtonClientInfo
 
         bool IsActive() { return GetTimeSinceLastContact() < LOST_CONTACT_TIME; }
 
+        unsigned int GetBatteryLevel();
+        void SetBatteryLevel(unsigned int level);
+
     private:
         IPAddress _ip;
         int _score;   
         std::string _id;
 
         unsigned long _lastContactMillis;
+
+        unsigned int _batteryLevel;;
 };

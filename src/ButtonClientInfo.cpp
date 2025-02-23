@@ -65,3 +65,13 @@ void ButtonClientInfo::ResetTimeSinceLastContact()
 {
     _lastContactMillis = millis();
 }
+
+unsigned int ButtonClientInfo::GetBatteryLevel()
+{
+    return _batteryLevel;
+}
+
+void ButtonClientInfo::SetBatteryLevel(unsigned int level)
+{
+    _batteryLevel = level;
+}

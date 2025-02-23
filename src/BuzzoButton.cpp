@@ -1,5 +1,10 @@
 
+#if defined(ESP32)
 #include <Wifi.h>
+#elif defined(ESP8266)
+#include <ESP8266WiFi.h>
+#endif
+
 #include <Arduino.h>
 #include <iostream>
 #include <vector>
@@ -36,7 +41,7 @@ void IdleEnter(BuzzoButton* button)
     //TODO: Turn off the lights
     //TODO: Show current score
 
-    button->_strip.SetBrightness(50);
+    button->_strip.SetLuminance(50);
     button->_strip.ClearTo(RgbColor(0,0,0));
 }
 
@@ -61,7 +66,7 @@ void IdleUpdate(BuzzoButton* button)
 
     if(timeInState < fadeBegin)
     {
-        button->_strip.SetBrightness(255);
+        button->_strip.SetLuminance(255);
         button->_strip.ClearTo(RgbColor(255,255,255));
         button->_strip.Show();
     }
@@ -69,7 +74,7 @@ void IdleUpdate(BuzzoButton* button)
     {
         if(button->_currentScore >= 6)
         {
-            button->_strip.SetBrightness(255);
+            button->_strip.SetLuminance(255);
             // uint16_t hue = (millis() * 50) % 0xFFFF;
             // button->_strip.rainbow(hue,1,255, 32);
             for(int i = 0; i < button->_strip.PixelCount(); i++)
@@ -81,14 +86,14 @@ void IdleUpdate(BuzzoButton* button)
         else
         {
 
-            button->_strip.SetBrightness(128);
+            button->_strip.SetLuminance(128);
 
             for(int i = 0; i < button->_strip.PixelCount(); i++)
             {
                 uint8_t targetBrightness = i < button->_currentScore ? 128 : 8;
                 uint8_t brightness = mapf((timeInState - fadeBegin) / (float)(fadeDuration), 0.0f, 1.0f, 255, targetBrightness);
 
-                button->_strip.SetBrightness(255);
+                button->_strip.SetLuminance(255);
                 button->_strip.SetPixelColor(i, RgbColor(brightness, brightness, brightness));
             }
             button->_strip.Show();
@@ -100,7 +105,7 @@ void IdleUpdate(BuzzoButton* button)
         {
             button->_isBlinking = ((millis()) % 3000) < 300;
 
-            button->_strip.SetBrightness(255);
+            button->_strip.SetLuminance(255);
 
             for(int i = 0; i < button->_strip.PixelCount(); i++)
             {
@@ -126,7 +131,7 @@ void AnsweringEnter(BuzzoButton* button)
 
 void AnsweringUpdate(BuzzoButton* button)
 {
-    button->_strip.SetBrightness(255);
+    button->_strip.SetLuminance(255);
 
     const float pulseAmount = 64;
     float pulse = 255 - pulseAmount + sin(millis() / 100.0f) * pulseAmount;
@@ -185,7 +190,7 @@ void AnsweringExit(BuzzoButton* button)
 
 void CorrectEnter(BuzzoButton* button)
 {
-    button->_strip.SetBrightness(255);
+    button->_strip.SetLuminance(255);
     button->_strip.ClearTo(RgbColor(0, 255, 0));
     button->_strip.Show();
 
@@ -218,7 +223,7 @@ void CorrectUpdate(BuzzoButton* button)
 
     if(timeInState < fadeBegin)
     {
-        button->_strip.SetBrightness(255);
+        button->_strip.SetLuminance(255);
 
         if(button->_currentScore >= 6)
         {
@@ -270,7 +275,7 @@ void CorrectExit(BuzzoButton* button)
 
 void IncorrectEnter(BuzzoButton* button)
 {
-    button->_strip.SetBrightness(255);
+    button->_strip.SetLuminance(255);
     button->_strip.ClearTo(RgbColor(255,0,0));
     button->_strip.Show();
 
@@ -294,7 +299,7 @@ void IncorrectUpdate(BuzzoButton* button)
 
     if(timeInState < fadeBegin)
     {
-        button->_strip.SetBrightness(255);
+        button->_strip.SetLuminance(255);
         button->_strip.ClearTo(RgbColor(255,0,0));
         button->_strip.Show();
     }
@@ -321,7 +326,7 @@ void QueuedEnter(BuzzoButton* button)
 
 void QueuedUpdate(BuzzoButton* button)
 {
-    button->_strip.SetBrightness(255);
+    button->_strip.SetLuminance(255);
     
     float offset = millis() / 2000.0f;
     offset = ((sin((offset + 0.5f)* TWO_PI) + (offset + 0.5f) * TWO_PI) / TWO_PI) - 0.5f;
@@ -376,7 +381,7 @@ void DisconnectedEnter(BuzzoButton* button)
 
 void DisconnectedUpdate(BuzzoButton* button)
 {
-    button->_strip.SetBrightness(96);
+    button->_strip.SetLuminance(96);
 
     float t = (sin(millis() / 500.0f) + 1.0f) / 2.0f;
 
@@ -409,7 +414,7 @@ void SelectedEnter(BuzzoButton* button)
 
 void SelectedUpdate(BuzzoButton* button)
 {
-    button->_strip.SetBrightness(96);
+    button->_strip.SetLuminance(96);
 
     float t = (sin(millis() / 500.0f) + 1.0f) / 2.0f;
 
@@ -504,7 +509,7 @@ _wasScoreUpdated(false),
 _isAnswerTimePaused(false)
 {
     _strip.Begin();
-    _strip.SetBrightness(50);
+    _strip.SetLuminance(50);
     _strip.Show(); // Initialize all pixels to 'off'
 
     _wedgeColors[0] = RgbColor(255,255,255);
@@ -584,7 +589,7 @@ void BuzzoButton::Update()
         // Periodically send a register command
         if(millis() - _lastSendTime > PING_INTERVAL || _lastSendTime == 0) 
         {
-            SendRegisterCommand(_uniqueId);
+            SendRegisterCommand(_uniqueId, _batteryLevel);
             _lastSendTime = millis();
         }
     }
@@ -763,6 +768,12 @@ void BuzzoButton::ShowBatteryLevelOnButton()
 
 void BuzzoButton::ProcessAnswerCommand(int timeLeft, int totalTime)
 {
+    if(totalTime == 0)
+    {
+        // If the total time is 0, then we can't divide by 0
+        totalTime = 1;
+    }
+    
     SetState(BuzzoButton::ANSWERING);
     _answeringTimeRemaining = abs(timeLeft);
     _answeringTotalTime = totalTime;
@@ -827,12 +838,16 @@ void BuzzoButton::ProcessSleepCommand()
 }
 
 
-void BuzzoButton::SendRegisterCommand(char* param)
+void BuzzoButton::SendRegisterCommand(char* id, unsigned int battery)
 {
+    battery = constrain(battery, 0, 100);
+
     udp.beginPacket(_controllerIp, PORT);
     udp.print(COMMAND_REGISTER);
     udp.print(" ");
-    udp.print(param);
+    udp.print(id);
+    udp.print(" ");
+    udp.print(battery);
     udp.endPacket();
 
     
