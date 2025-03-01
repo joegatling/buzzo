@@ -5,8 +5,10 @@
 ToneGenerator::ToneGenerator():
 _isTicking(false),
 _currentNote(0),
-_currentDuration(0)
+_currentDuration(0),
+_tickingUrgency(1)
 {
+    ledcDetachPin(SPEAKER_PIN);
 }
 
 void ToneGenerator::DoSound(SoundId soundId, bool clearQueue)
@@ -145,7 +147,8 @@ void ToneGenerator::Update()
         if(millis() - _lastNoteTime > _currentDuration)
         {
             _currentNote = 0;
-            noTone(SPEAKER_PIN);
+            //noTone(SPEAKER_PIN);
+            ledcDetachPin(SPEAKER_PIN);
         }
     }
 
@@ -156,9 +159,10 @@ void ToneGenerator::Update()
         _currentNote = _soundQueue[index][0];
         _currentDuration = _soundQueue[index][1];
 
-        if(_currentNote != NOTE_NONE)
+        if(_currentNote != NOTE_NONE && _currentNote >= NOTE_MIN && _currentNote <= NOTE_MAX)
         {
-            tone(SPEAKER_PIN, _currentNote, _currentDuration);
+            ledcAttachPin(SPEAKER_PIN, 0);
+            ledcWriteTone(0, _currentNote);
         }
         
         _soundQueueStart = (_soundQueueStart + 1) % MAX_SOUND_QUEUE;
@@ -172,7 +176,8 @@ void ToneGenerator::Update()
 void ToneGenerator::ClearSoundQueue()
 {
     _soundQueueCount = 0;
-    noTone(SPEAKER_PIN);
+    //noTone(SPEAKER_PIN);
+    ledcDetachPin(SPEAKER_PIN);
 }
 
 void ToneGenerator::EnqueueNote(unsigned int note, unsigned int duration)
@@ -187,3 +192,4 @@ void ToneGenerator::EnqueueNote(unsigned int note, unsigned int duration)
         _soundQueueCount++;
     }
 }
+

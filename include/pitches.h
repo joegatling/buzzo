@@ -91,3 +91,6 @@
 #define NOTE_CS8 4435
 #define NOTE_D8 4699
 #define NOTE_DS8 4978
+
+#define NOTE_MIN (NOTE_B0)
+#define NOTE_MAX (NOTE_DS8)

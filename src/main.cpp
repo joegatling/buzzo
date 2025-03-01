@@ -39,7 +39,7 @@ const char* password = "123456789";
 #define RANGE_END 40
 
 #define BATTERY_MAX 4.2f
-#define BATTERY_MIN 3.25f
+#define BATTERY_MIN 3.3f
 
 bool isConnected = false;
 unsigned long lastConnectionCheckTime = 0;
@@ -50,6 +50,10 @@ unsigned long batteryReportInterval = 0;
 
 float mapFloat(float x, float in_min, float in_max, float out_min, float out_max) 
 {
+  if(in_max == in_min)
+  {
+    return out_min;
+  }
   return (x - in_min) * (out_max - out_min) / (in_max - in_min) + out_min;
 }
 
@@ -64,15 +68,15 @@ unsigned int GetBatteryLevel()
     batteryPercentage = max(0.0f, batteryPercentage);
     batteryPercentage = min(100.0f, batteryPercentage);
 
-    // if(millis() - batteryReportInterval > 5000)
-    // {
-    //   batteryReportInterval = millis();
-    //   Serial.print("Battery: ");
-    //   Serial.print(voltage);
-    //   Serial.print("v (");
-    //   Serial.print(batteryPercentage);    
-    //   Serial.println("%)");
-    // }
+    if(millis() - batteryReportInterval > 5000)
+    {
+      batteryReportInterval = millis();
+      Serial.print("Battery: ");
+      Serial.print(voltage);
+      Serial.print("v (");
+      Serial.print(batteryPercentage);    
+      Serial.println("%)");
+    }
 
     return (unsigned int)batteryPercentage;
 }

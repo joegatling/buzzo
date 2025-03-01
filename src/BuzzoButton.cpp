@@ -157,6 +157,8 @@ void AnsweringUpdate(BuzzoButton* button)
     
     if(button->_answeringTimeRemaining < 10)
     {
+        button->_toneGenerator.SetTickingUrgency(1.0f - (button->_answeringTimeRemaining / 10.0f));
+        
         if(button->_isAnswerTimePaused)
         {
             if(button->_hasStartedWarning == true)
@@ -175,7 +177,6 @@ void AnsweringUpdate(BuzzoButton* button)
             }
         }
 
-        button->_toneGenerator.SetTickingUrgency(1.0f - (button->_answeringTimeRemaining / 10.0f));
     }
 
 
@@ -627,16 +628,16 @@ void BuzzoButton::ProcessPacket()
 
             while(!data.eof() && paramCount < sizeof(params))
             {
-                if(paramCount == 0)
-                {
-                    Serial.println("Params:");
-                }
+                // if(paramCount == 0)
+                // {
+                //     Serial.println("Params:");
+                // }
 
                 data >> params[paramCount];
                 
-                Serial.print(paramCount);
-                Serial.print(": ");
-                Serial.println(params[paramCount].c_str());
+                // Serial.print(paramCount);
+                // Serial.print(": ");
+                // Serial.println(params[paramCount].c_str());
 
                 paramCount++;
             }
@@ -773,7 +774,7 @@ void BuzzoButton::ProcessAnswerCommand(int timeLeft, int totalTime)
         // If the total time is 0, then we can't divide by 0
         totalTime = 1;
     }
-    
+
     SetState(BuzzoButton::ANSWERING);
     _answeringTimeRemaining = abs(timeLeft);
     _answeringTotalTime = totalTime;
