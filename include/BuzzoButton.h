@@ -56,6 +56,8 @@ class BuzzoButton
 
         void DisableLightsAndSound();
 
+        ToneGenerator* GetToneGenerator() { return &_toneGenerator; }
+
     private:
         static BuzzoButton* _instance;
 
@@ -140,6 +142,8 @@ class BuzzoButton
 
         unsigned int _batteryLevel;
         bool _isBlinking; 
+
+        int _currentWedgeCount;
 
         RgbColor _wedgeColors[7];
 

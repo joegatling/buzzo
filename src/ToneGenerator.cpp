@@ -93,11 +93,26 @@ void ToneGenerator::DoSound(SoundId soundId, bool clearQueue)
     {
         EnqueueNote(140 + (75 * _tickingUrgency), 50);
     }
-    if(soundId == ToneGenerator::ACKNOWLEDGE)
+    else if(soundId == ToneGenerator::ACKNOWLEDGE)
     {
         EnqueueNote(NOTE_E2, 20);
         EnqueueNote(NOTE_E3, 20);
-    }    
+    } 
+    else if(soundId == ToneGenerator::POWER_ON)
+    {
+        EnqueueNote(NOTE_E4, 50);
+        EnqueueNote(NOTE_G4, 50);
+        EnqueueNote(NOTE_E5, 50);
+        EnqueueNote(NOTE_G5, 50);
+    }
+    else if(soundId == ToneGenerator::POWER_OFF)
+    {
+        EnqueueNote(NOTE_G5, 50);
+        EnqueueNote(NOTE_E5, 50);
+        EnqueueNote(NOTE_G4, 50);
+        EnqueueNote(NOTE_E4, 50);
+    }
+
 }
 
 void ToneGenerator::StartTicking()

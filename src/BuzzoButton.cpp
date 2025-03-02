@@ -127,6 +127,8 @@ void AnsweringEnter(BuzzoButton* button)
 {
     button->_hasStartedWarning = false;
     button->_toneGenerator.DoSound(ToneGenerator::RESPOND, false);
+    button->_currentWedgeCount = 6;
+    button->_toneGenerator.SetTickingUrgency(0.0f);
 }
 
 void AnsweringUpdate(BuzzoButton* button)
@@ -177,6 +179,14 @@ void AnsweringUpdate(BuzzoButton* button)
             }
         }
 
+    }
+    else
+    {
+        if(button->_currentWedgeCount > lightsToShow)
+        {
+            button->_currentWedgeCount = lightsToShow;
+            button->_toneGenerator.DoSound(lightsToShow % 2 == 0 ? ToneGenerator::TICK : ToneGenerator::TOCK, false);
+        }    
     }
 
 
@@ -461,7 +471,8 @@ void OnButtonHold(BuzzoButton* button)
 {
     button->DisableLightsAndSound();
     button->SetState(BuzzoButton::NONE);
-    delay(100);
+
+    button->GetToneGenerator()->DoSound(ToneGenerator::POWER_OFF);
 }
 
 void OnButtonHoldRelease(BuzzoButton* button)
@@ -549,7 +560,9 @@ _isAnswerTimePaused(false)
 }
 
 void BuzzoButton::Initialize()
-{}
+{
+    _toneGenerator.DoSound(ToneGenerator::POWER_ON);
+}
 
 void BuzzoButton::Update()
 {
@@ -834,7 +847,7 @@ void BuzzoButton::ProcessScoreCommand(int score)
 void BuzzoButton::ProcessSleepCommand()
 {
     DisableLightsAndSound();
-    sleep(100);
+    delay(100);
     OnButtonHoldRelease(this);
 }
 

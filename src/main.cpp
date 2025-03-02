@@ -111,32 +111,6 @@ void Sleep()
     #endif      
 }
 
-// void setupLEDC()
-// {
-//   #if defined(BUZZO_CONTROLLER)
-//   // Set the LEDC timer configuration
-//     ledc_timer_config_t ledc_timer = {
-//         .speed_mode       = LEDC_HIGH_SPEED_MODE,
-//         .duty_resolution  = LEDC_TIMER_13_BIT,
-//         .timer_num        = LEDC_TIMER_0,
-//         .freq_hz          = 5000,  // Frequency in Hertz
-//         .clk_cfg          = LEDC_AUTO_CLK
-//     };
-//     ledc_timer_config(&ledc_timer);
-
-//     // Set the LEDC channel configuration
-//     ledc_channel_config_t ledc_channel = {
-//         .speed_mode     = LEDC_HIGH_SPEED_MODE,
-//         .channel        = LEDC_CHANNEL_0,
-//         .timer_sel      = LEDC_TIMER_0,
-//         .intr_type      = LEDC_INTR_FADE_END,
-//         .gpio_num       = LOW_POWER_PIN,  // GPIO number
-//         .duty           = 0,        // Initial duty cycle
-//         .hpoint         = 0
-//     };
-//     ledc_channel_config(&ledc_channel);
-//   #endif
-// }
 
 
 
@@ -149,7 +123,6 @@ void setup()
 
   #if defined(ESP32)  
     setCpuFrequencyMhz(80);
-    //setupLEDC();
   #endif
 
   #if BUZZO_CONTROLLER
@@ -188,7 +161,6 @@ void setup()
 
     BuzzoButton::GetInstance()->SetBatteryLevel(GetBatteryLevel());
     BuzzoButton::GetInstance()->ShowBatteryLevelOnButton();
-    delay(1500);
 
   #endif
 

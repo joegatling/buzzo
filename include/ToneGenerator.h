@@ -19,7 +19,9 @@ class ToneGenerator
         RESPOND,
         TICK,
         TOCK,
-        ACKNOWLEDGE
+        ACKNOWLEDGE,
+        POWER_ON,
+        POWER_OFF
     };
 
     ToneGenerator();
