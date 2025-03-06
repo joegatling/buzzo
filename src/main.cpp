@@ -7,6 +7,11 @@
 #endif
 #include <Adafruit_NeoPixel.h>
 
+#if defined(BUZZO_BUTTON_ADAFRUIT)
+#include "Adafruit_MAX1704X.h"
+
+Adafruit_MAX17048 maxlipo;
+#endif
 
 #if BUZZO_CONTROLLER
 
@@ -24,6 +29,7 @@
 #else
 
   #include "BuzzoButton.h"
+
   #define DISCONNECTED_SLEEP_TIMER  (2 * 60 * 1000)
   #define CONNECTED_SLEEP_TIMER     (15 * 60 * 1000)
 
@@ -59,6 +65,16 @@ float mapFloat(float x, float in_min, float in_max, float out_min, float out_max
 
 unsigned int GetBatteryLevel()
 {
+  #if defined(BUZZO_BUTTON_ADAFRUIT)
+    float cellVoltage = maxlipo.cellVoltage();
+    if (isnan(cellVoltage)) 
+    {
+      Serial.println("Failed to read cell voltage, check battery is connected!");
+      delay(2000);
+      return 100;
+    }
+    return (int)maxlipo.cellPercent();
+  #else
     int sensorValue = analogReadMilliVolts(BATT_MONITOR);
     sensorValue *= 2;
     float voltage = sensorValue / 1000.0f;
@@ -79,6 +95,7 @@ unsigned int GetBatteryLevel()
     }
 
     return (unsigned int)batteryPercentage;
+  #endif
 }
 
 void Sleep()
@@ -97,8 +114,10 @@ void Sleep()
 
     delay(100);
 
-    #if defined(ESP32)
+    #if defined(BUZZO_BUTTON_ALIEXPRESS)
       esp_sleep_enable_ext0_wakeup(GPIO_NUM_32, LOW);
+    #elif defined(BUZZO_BUTTON_ADAFRUIT)
+      esp_sleep_enable_ext0_wakeup(GPIO_NUM_9, LOW);
     #endif  
 
     #if BUZZO_CONTROLLER
@@ -124,6 +143,17 @@ void setup()
   #if defined(ESP32)  
     setCpuFrequencyMhz(80);
   #endif
+
+  #if defined(BUZZO_BUTTON_ADAFRUIT)
+  while (!maxlipo.begin()) {
+    Serial.println(F("Couldnt find Adafruit MAX17048?\nMake sure a battery is plugged in!"));
+    delay(2000);
+  }
+  Serial.print(F("Found MAX17048"));
+  Serial.print(F(" with Chip ID: 0x")); 
+  Serial.println(maxlipo.getChipID(), HEX);  
+  #endif
+
 
   #if BUZZO_CONTROLLER
 
@@ -163,6 +193,7 @@ void setup()
     BuzzoButton::GetInstance()->ShowBatteryLevelOnButton();
 
   #endif
+
 
 
 }
@@ -219,6 +250,7 @@ void loop()
 
 void loop() 
 {  
+  
   if(BuzzoButton::GetInstance()->GetState() != BuzzoButton::NONE)
   {
     unsigned long timeSinceWake = millis() - wakeTime;

@@ -1,6 +1,10 @@
 #include "ToneGenerator.h"
 
-#define SPEAKER_PIN 15
+#if defined(BUZZO_BUTTON_ALIEXPRESS)
+    #define SPEAKER_PIN 15
+#elif defined(BUZZO_BUTTON_ADAFRUIT)
+    #define SPEAKER_PIN 9
+#endif
 
 ToneGenerator::ToneGenerator():
 _isTicking(false),

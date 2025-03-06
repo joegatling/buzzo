@@ -482,7 +482,12 @@ void OnButtonHoldRelease(BuzzoButton* button)
         
     delay(100);
 
-    esp_sleep_enable_ext0_wakeup(GPIO_NUM_32, LOW);
+    #if defined(BUZZO_BUTTON_ALIEXPRESS)
+        esp_sleep_enable_ext0_wakeup(GPIO_NUM_32, LOW);
+    #elif defined(BUZZO_BUTTON_ADAFRUIT)
+        esp_sleep_enable_ext0_wakeup(GPIO_NUM_9, LOW);
+    #endif
+    
     esp_deep_sleep_start();   
 }
 

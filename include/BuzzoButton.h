@@ -14,8 +14,13 @@
 
 #define NUM_LED 6
 
-#define BUZZER_BUTTON_PIN 32
-#define NEOPIXEL_PIN 14
+#if defined(BUZZO_BUTTON_ALIEXPRESS)
+    #define BUZZER_BUTTON_PIN 32
+    #define NEOPIXEL_PIN 14
+#elif defined(BUZZO_BUTTON_ADAFRUIT)
+    #define BUZZER_BUTTON_PIN 6
+    #define NEOPIXEL_PIN 5
+#endif
 
 #define UNIQUE_ID_LEN 32
 
