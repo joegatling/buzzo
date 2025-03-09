@@ -1,8 +1,11 @@
+#include <WiFi.h>
+#include <esp_now.h>
 #include <string>
 #include <Arduino.h>
 #include <iostream>
 #include <string>
 #include <sstream>
+
 
 #include "BuzzoController.h"
 #include "Commands.h"
@@ -14,12 +17,41 @@
 
 #define MAX_SCORE 6
 
+#define MAX_DATA_SIZE 128
+
 inline std::string trim(const std::string &s)
 {
    auto wsfront=std::find_if_not(s.begin(),s.end(),[](int c){return std::isspace(c);});
    auto wsback=std::find_if_not(s.rbegin(),s.rend(),[](int c){return std::isspace(c);}).base();
    return (wsback<=wsfront ? std::string() : std::string(wsfront,wsback));
 }
+
+#pragma region ESP-NOW Callbacks
+void OnControllerDataSent(const uint8_t *mac_addr, esp_now_send_status_t status) 
+{
+    // Serial.print("Last Packet Sent Status: ");
+    // Serial.println(status == ESP_NOW_SEND_SUCCESS ? "Delivery Success" : "Delivery Fail");
+}
+
+void OnControllerDataReceived(const uint8_t *mac, const uint8_t *data, int len) 
+{
+    len = min(len, PACKET_MAX_SIZE);
+
+    char packetBuffer[MAX_DATA_SIZE + 1];
+    memcpy(packetBuffer, data, len);
+    packetBuffer[len] = 0;
+
+    BuzzoController::GetInstance()->EnqueuePacketData(mac, packetBuffer);
+
+    // Serial.print("Last Packet Recv Data: ");
+    // for(int i = 0; i < len; i++)
+    // {
+    //     Serial.print((char)data[i]);
+    // }
+    // Serial.println();
+
+}
+#pragma endregion
 
 BuzzoController* BuzzoController::_instance = 0;
 BuzzoController* BuzzoController::GetInstance()
@@ -46,11 +78,38 @@ _isInAdjustMode(false)
 {
     _currentRespondant.assign("");
     _clientCount = 0;
-    udp.begin(PORT);
+
+    for(int i = 0; i < PACKET_MAX_QUEUE; i++)
+    {
+        memset(packetQueue[i].mac, 0, sizeof(packetQueue[i].mac));
+        memset(packetQueue[i].packetBuffer, 0, sizeof(packetQueue[i].packetBuffer));
+    }
+
+    //udp.begin(PORT);
+    WiFi.mode(WIFI_STA);
+    WiFi.channel(0);    
+
+    if(esp_now_init() != ESP_OK)
+    {
+        Serial.println("Error initializing ESP-NOW");
+    }
+
+    uint8_t baseMac[6];
+
+    WiFi.macAddress(baseMac);
+    Serial.print("Mac Address: ");
+    Serial.printf("%02x:%02x:%02x:%02x:%02x:%02x\n",
+                baseMac[0], baseMac[1], baseMac[2],
+                baseMac[3], baseMac[4], baseMac[5]);
+
+    esp_now_register_send_cb(OnControllerDataSent);
+    esp_now_register_recv_cb(OnControllerDataReceived);
 
     _participantCount = 0;
 
     _lastMillis = millis();
+
+    Serial.println("Init complete");
 }
 
 void BuzzoController::Initialize()
@@ -75,7 +134,8 @@ void BuzzoController::Initialize()
 
 void BuzzoController::Update()
 {
-    ProcessPacket();
+    // ProcessPacket();
+    ProcessPacketQueue();
 
     _correctButton.Update();
     _incorrectButton.Update();
@@ -95,23 +155,58 @@ void BuzzoController::Update()
 }
 
 #pragma region Command Processing
-void BuzzoController::ProcessPacket()
+
+void BuzzoController::EnqueuePacketData(const uint8_t *mac, const char* packetBuffer)
 {
-    int packetSize = udp.parsePacket();
-    if (packetSize) 
-    {    
-        Serial.printf("Received packet of size %d from %s:%d\n \n", 
-        packetSize, 
+    if(_packetQueueCount < PACKET_MAX_QUEUE)
+    {
+        unsigned int index = (_packetQueueIndex + _packetQueueCount) % PACKET_MAX_QUEUE;
+        
+        memcpy(packetQueue[index].mac, mac, sizeof(packetQueue[index].mac));
+        strncpy(packetQueue[index].packetBuffer, packetBuffer, PACKET_MAX_SIZE);
+        packetQueue[index].packetBuffer[PACKET_MAX_SIZE] = '\0'; // Ensure null-termination
 
-        udp.remoteIP().toString().c_str(), 
-        udp.remotePort());
+        _packetQueueCount++;
+    }
+}
 
-        // read the packet into packetBufffer
-        int n = udp.read(packetBuffer, PACKET_MAX_SIZE);
-        packetBuffer[n] = 0;
 
-        Serial.println("Contents:");
-        Serial.println(packetBuffer); 
+void BuzzoController::ProcessPacketQueue()
+{
+    if(_packetQueueCount > 0)
+    {
+        uint8_t mac[6];
+        memcpy(mac, packetQueue[_packetQueueIndex].mac, sizeof(mac));
+        
+        char buffer[PACKET_MAX_SIZE + 1];
+        
+        memcpy(buffer, packetQueue[_packetQueueIndex].packetBuffer, PACKET_MAX_SIZE);
+        buffer[PACKET_MAX_SIZE] = 0;
+
+        ProcessPacket(mac, buffer);
+
+        _packetQueueCount--;
+        _packetQueueIndex = (_packetQueueIndex + 1) % PACKET_MAX_QUEUE;
+    }
+}
+
+void BuzzoController::ProcessPacket(const uint8_t *mac, const char* packetBuffer)
+{
+    // int packetSize = udp.parsePacket();
+    // if (packetSize) 
+    // {    
+    //     Serial.printf("Received packet of size %d from %s:%d\n \n", 
+    //     packetSize, 
+
+    //     udp.remoteIP().toString().c_str(), 
+    //     udp.remotePort());
+
+    //     // read the packet into packetBufffer
+    //     int n = udp.read(packetBuffer, PACKET_MAX_SIZE);
+    //     packetBuffer[n] = 0;
+
+    //     Serial.println("Contents:");
+    //     Serial.println(packetBuffer); 
 
         std::stringstream data(packetBuffer);
         std::string command;
@@ -138,7 +233,7 @@ void BuzzoController::ProcessPacket()
             // Process Packet
             if(command.compare(COMMAND_BUZZ) == 0)
             {
-                ProcessBuzzCommand(udp.remoteIP());
+                ProcessBuzzCommand(mac);
             }
             else if(command.compare(COMMAND_REGISTER) == 0)
             {
@@ -146,11 +241,11 @@ void BuzzoController::ProcessPacket()
                 {
                     if(params[1].length() > 0)
                     {
-                        ProcessRegisterCommand(udp.remoteIP(), params[0], params[1]);
+                        ProcessRegisterCommand(mac, params[0], params[1]);
                     }
                     else
                     {
-                        ProcessRegisterCommand(udp.remoteIP(), params[0], "100");
+                        ProcessRegisterCommand(mac, params[0], "100");
                     }
                 }
                 else
@@ -172,12 +267,21 @@ void BuzzoController::ProcessPacket()
         {
             Serial.println("ERROR");
         }        
-    }
+    //}
 }
 
-void BuzzoController::ProcessRegisterCommand(IPAddress ip, std::string paramId, std::string paramBattery)
+void BuzzoController::ProcessRegisterCommand(const uint8_t *mac, std::string paramId, std::string paramBattery)
 {
     Serial.println("Registering Client");
+
+    Serial.print("MAC ");
+    for(int i = 0; i < 6; i++)
+    {
+        Serial.print(mac[i], HEX);
+        Serial.print(":");
+    }
+    Serial.println();
+
     Serial.print("ID ");
     Serial.println(paramId.c_str());
 
@@ -187,7 +291,7 @@ void BuzzoController::ProcessRegisterCommand(IPAddress ip, std::string paramId, 
 
     for(int i = 0; i < _clientCount; i++)
     {
-        if(_clients[i]->GetId().compare(paramId) == 0)
+        if(_clients[i]->CompareMac(mac))
         {
             Serial.println("Resetting Contact Time...");
             _clients[i]->ResetTimeSinceLastContact();
@@ -197,51 +301,56 @@ void BuzzoController::ProcessRegisterCommand(IPAddress ip, std::string paramId, 
 
             //Serial.println(_clients[i]->GetTimeSinceLastContact());
 
-            // An entry with a different IP is associated with this ID. This
-            // means the button has been assigned a new IP.
-            _clients[i]->SetIpAddress(ip);            
-
+            // // An entry with a different IP is associated with this ID. This
+            // // means the button has been assigned a new IP.
+            // _clients[i]->SetIpAddress(ip);     
+            
             // Scan through the remaining clients and make sure any duplicate
             // entries with this IP don't exist
-            for(int j = 0; j<_clientCount; j++)
-            {    
-                if(j != i && _clients[j]->GetIpAddress() == ip)
-                {
-                    delete _clients[j];
-                    RemoveClientAt(j);                    
-                }
-            }
+            // for(int j = 0; j<_clientCount; j++)
+            // {    
+            //     if(j != i && _clients[j]->GetIpAddress() == ip)
+            //     {
+            //         delete _clients[j];
+            //         RemoveClientAt(j);                    
+            //     }
+            // }
 
             // Tell the client what it's current score is
-            SendScoreCommand(ip, _clients[i]->GetScore());
+            SendScoreCommand(mac, _clients[i]->GetScore());
 
             return;
         } 
-        else if(_clients[i]->GetIpAddress() == ip)
-        {
-            _clients[i]->ResetTimeSinceLastContact();
+        // else if(_clients[i]->GetIpAddress() == ip)
+        // {
+        //     _clients[i]->ResetTimeSinceLastContact();
 
-            // If this IP is to be associated with a new ID, then this must
-            // be an entirely new Button, so reset the score too.
+        //     // If this IP is to be associated with a new ID, then this must
+        //     // be an entirely new Button, so reset the score too.
 
             
-            _clients[i]->SetId(paramId);
-            _clients[i]->SetScore(0);
+        //     _clients[i]->SetId(paramId);
+        //     _clients[i]->SetScore(0);
 
-            int batteryLevel = atoi(paramBattery.c_str());
-            _clients[i]->SetBatteryLevel(batteryLevel);            
+        //     int batteryLevel = atoi(paramBattery.c_str());
+        //     _clients[i]->SetBatteryLevel(batteryLevel);            
 
-            return;
-        }  
+        //     return;
+        // }  
     }
 
-    // If we got here, we don't have a registered client with the IP
+    // If we got here, we don't have a registered client with the MAC
+    // Let's first cull all inactive clients
     if(_clientCount >= MAX_CLIENTS)
     {
         for(int i = _clientCount-1; i >= 0; i--)
         {
             if(_clients[i]->IsActive() == false)
             {
+                uint8_t inactiveMac[6];
+                _clients[i]->GetMacAddress(inactiveMac);
+                esp_now_del_peer(inactiveMac);
+
                 delete _clients[i];
                 RemoveClientAt(i);                
                 break;
@@ -252,27 +361,41 @@ void BuzzoController::ProcessRegisterCommand(IPAddress ip, std::string paramId, 
     // Add this client (if we can)
     if(_clientCount < MAX_CLIENTS)
     {
-        ButtonClientInfo* newClient = new ButtonClientInfo(ip, paramId);
+        ButtonClientInfo* newClient = new ButtonClientInfo(mac, paramId);
         AddClient(newClient);
 
         int batteryLevel = atoi(paramBattery.c_str());
-        newClient->SetBatteryLevel(batteryLevel);            
+        newClient->SetBatteryLevel(batteryLevel);       
+        
+        // Add as an ESP-NOW peer
+        esp_now_peer_info_t peerInfo = {};
+        memcpy(peerInfo.peer_addr, mac, 6);
+        peerInfo.channel = 0;
+        peerInfo.encrypt = false;
 
+        if(esp_now_add_peer(&peerInfo) != ESP_OK)
+        {
+            Serial.println("Error adding peer");
+        }
+
+        SendScoreCommand(mac, newClient->GetScore());
     }
     else
     {
-        SendErrorCommand(ip, ERROR_TOO_MANY_CLIENTS);
+        SendErrorCommand(mac, ERROR_TOO_MANY_CLIENTS);
     }
 }
 
-void BuzzoController::ProcessBuzzCommand(IPAddress ip)
+void BuzzoController::ProcessBuzzCommand(const uint8_t *mac)
 {
     Serial.print("Processing buzz command from ");
-    Serial.println(ip.toString());
-
-    auto client = GetClient(ip);
-
-
+    for(int i = 0; i < 6; i++)
+    {
+        Serial.print(mac[i], HEX);
+        Serial.print(":");
+    }
+    Serial.println();
+    auto client = GetClient(mac);
 
     if(client != 0)
     {
@@ -285,7 +408,7 @@ void BuzzoController::ProcessBuzzCommand(IPAddress ip)
             Serial.print("Score: ");
             Serial.println(client->GetScore());
 
-            SendScoreCommand(client->GetIpAddress(), client->GetScore());
+            SendScoreCommand(mac, client->GetScore());
         }
         else
         {
@@ -305,7 +428,7 @@ void BuzzoController::ProcessBuzzCommand(IPAddress ip)
                 // it needs to wait before it can respond.
                 if(_responseQueue.GetResponseCount() > 1 || _currentRespondant.length() > 0)
                 {
-                    SendQueueCommand(ip, _responseQueue.GetResponseCount());
+                    SendQueueCommand(mac, _responseQueue.GetResponseCount());
                 }
 
                 // Note: A respondant will be selected in the next update, so all we need to here is enqueue
@@ -319,72 +442,97 @@ void BuzzoController::ProcessBuzzCommand(IPAddress ip)
 #pragma endregion
 
 #pragma region Command Functions
-void BuzzoController::SendAnswerCommand(IPAddress ip, int timer, int totalTime)
+void BuzzoController::SendAnswerCommand(const uint8_t *mac, int timer, int totalTime)
 {
-    udp.beginPacket(ip, PORT);
-    udp.print(COMMAND_ANSWER);
-    udp.print(" ");
-    udp.print(timer);
-    udp.print(" ");
-    udp.print(totalTime);
-    udp.endPacket();
+    String message = String(COMMAND_ANSWER) + " " + timer + " " + totalTime;
+    esp_now_send(mac, (uint8_t*)message.c_str(), message.length());
+
+    // udp.beginPacket(ip, PORT);
+    // udp.print(COMMAND_ANSWER);
+    // udp.print(" ");
+    // udp.print(timer);
+    // udp.print(" ");
+    // udp.print(totalTime);
+    // udp.endPacket();
 }
 
-void BuzzoController::SendQueueCommand(IPAddress ip, int placeInQueue)
+void BuzzoController::SendQueueCommand(const uint8_t *mac, int placeInQueue)
 {
-    udp.beginPacket(ip, PORT);
-    udp.print(COMMAND_QUEUE);
-    udp.print(" ");
-    udp.print(placeInQueue);
-    udp.endPacket();
+    String message = String(COMMAND_QUEUE) + " " + placeInQueue;
+    esp_now_send(mac, (uint8_t*)message.c_str(), message.length());
+
+    // udp.beginPacket(ip, PORT);
+    // udp.print(COMMAND_QUEUE);
+    // udp.print(" ");
+    // udp.print(placeInQueue);
+    // udp.endPacket();
 }
 
-void BuzzoController::SendResponseCommand(IPAddress ip, bool isCorrect)
+void BuzzoController::SendResponseCommand(const uint8_t *mac, bool isCorrect)
 {
-    udp.beginPacket(ip, PORT);
-    udp.print( isCorrect ? COMMAND_CORRECT_RESPONSE : COMMAND_INCORRECT_RESPONSE );
-    udp.endPacket();
+    String message = String(isCorrect ? COMMAND_CORRECT_RESPONSE : COMMAND_INCORRECT_RESPONSE);
+    esp_now_send(mac, (uint8_t*)message.c_str(), message.length());
+
+    // udp.beginPacket(ip, PORT);
+    // udp.print(isCorrect ? COMMAND_CORRECT_RESPONSE : COMMAND_INCORRECT_RESPONSE);
+    // udp.endPacket();
+
 }
 
-void BuzzoController::SendResetCommand(IPAddress ip, bool canBuzz)
+void BuzzoController::SendResetCommand(const uint8_t *mac, bool canBuzz)
 {
-    udp.beginPacket(ip, PORT);
-    udp.print(COMMAND_RESET);
-    udp.print(" ");
-    udp.print(canBuzz);    
-    udp.endPacket();
+    // udp.beginPacket(ip, PORT);
+    // udp.print(COMMAND_RESET);
+    // udp.print(" ");
+    // udp.print(canBuzz);    
+    // udp.endPacket();
+
+    String message = String(COMMAND_RESET) + " " + canBuzz;
+    esp_now_send(mac, (uint8_t*)message.c_str(), message.length());
 }
 
-void BuzzoController::SendSelectCommand(IPAddress ip)
+void BuzzoController::SendSelectCommand(const uint8_t *mac)
 {
-    udp.beginPacket(ip, PORT);
-    udp.print(COMMAND_SELECT);
-    udp.endPacket();
+    // udp.beginPacket(ip, PORT);
+    // udp.print(COMMAND_SELECT);
+    // udp.endPacket();
+
+    String message = String(COMMAND_SELECT);
+    esp_now_send(mac, (uint8_t*)message.c_str(), message.length());
 }
 
-void BuzzoController::SendErrorCommand(IPAddress ip, int errorCode)
+void BuzzoController::SendErrorCommand(const uint8_t *mac, int errorCode)
 {
-    udp.beginPacket(ip, PORT);
-    udp.print(COMMAND_ERROR);
-    udp.print(" ");
-    udp.print(errorCode);    
-    udp.endPacket();
+    // udp.beginPacket(ip, PORT);
+    // udp.print(COMMAND_ERROR);
+    // udp.print(" ");
+    // udp.print(errorCode);    
+    // udp.endPacket();
+
+    String message = String(COMMAND_ERROR) + " " + errorCode;
+    esp_now_send(mac, (uint8_t*)message.c_str(), message.length());
 }
 
-void BuzzoController::SendScoreCommand(IPAddress ip, int score = 0)
+void BuzzoController::SendScoreCommand(const uint8_t *mac, int score = 0)
 {
-    udp.beginPacket(ip, PORT);
-    udp.print(COMMAND_SCORE);
-    udp.print(" ");
-    udp.print(score);    
-    udp.endPacket();
+    // udp.beginPacket(ip, PORT);
+    // udp.print(COMMAND_SCORE);
+    // udp.print(" ");
+    // udp.print(score);    
+    // udp.endPacket();
+
+    String message = String(COMMAND_SCORE) + " " + score;
+    esp_now_send(mac, (uint8_t*)message.c_str(), message.length());
 }
 
-void BuzzoController::SendSleepCommand(IPAddress ip)
+void BuzzoController::SendSleepCommand(const uint8_t *mac)
 {
-    udp.beginPacket(ip, PORT);
-    udp.print(COMMAND_SLEEP);
-    udp.endPacket();
+    // udp.beginPacket(ip, PORT);
+    // udp.print(COMMAND_SLEEP);
+    // udp.endPacket();
+
+    String message = String(COMMAND_SLEEP);
+    esp_now_send(mac, (uint8_t*)message.c_str(), message.length());
 }
 #pragma endregion
 
@@ -420,7 +568,10 @@ void BuzzoController::UpdatePlaying()
                         secondsRemaining = -secondsRemaining;
                     }
 
-                    SendAnswerCommand(client->GetIpAddress(), secondsRemaining, RESPONSE_TIME_LIMIT);
+                    uint8_t mac[6];
+                    client->GetMacAddress(mac);
+
+                    SendAnswerCommand(mac, secondsRemaining, RESPONSE_TIME_LIMIT);
                 }
 
                 _lastRespondantPingTime = millis();
@@ -433,7 +584,10 @@ void BuzzoController::UpdatePlaying()
 
                 if(client != 0)
                 {
-                    SendResponseCommand(client->GetIpAddress(), false);
+                    uint8_t mac[6];
+                    client->GetMacAddress(mac);
+
+                    SendResponseCommand(mac, false);
                 }
 
                 _previousRespondant.assign(_currentRespondant);
@@ -468,7 +622,10 @@ void BuzzoController::UpdatePlaying()
                     _responseStartTime = millis();
                     _responsePauseTime = 0;
 
-                    SendAnswerCommand(client->GetIpAddress(), RESPONSE_TIME_LIMIT, RESPONSE_TIME_LIMIT);
+                    uint8_t mac[6];
+                    client->GetMacAddress(mac);
+
+                    SendAnswerCommand(mac, RESPONSE_TIME_LIMIT, RESPONSE_TIME_LIMIT);
                     _lastRespondantPingTime = millis();
                 }
 
@@ -480,7 +637,11 @@ void BuzzoController::UpdatePlaying()
                     if(client != 0 && client->IsActive())
                     {
                         placeInQueue++;
-                        SendQueueCommand(client->GetIpAddress(), placeInQueue);
+
+                        uint8_t mac[6];
+                        client->GetMacAddress(mac);
+
+                        SendQueueCommand(mac, placeInQueue);
                     }
                 }
             }
@@ -521,11 +682,11 @@ void BuzzoController::RemoveClientAt(unsigned int index)
     }
 }
 
-ButtonClientInfo* BuzzoController::GetClient(IPAddress ip)
+ButtonClientInfo* BuzzoController::GetClient(const uint8_t *mac)
 {
     for(int i = 0; i < _clientCount; i++)
     {
-        if(_clients[i]->GetIpAddress() == ip)
+        if(_clients[i]->CompareMac(mac))
         {
             return _clients[i];
         }
@@ -632,7 +793,10 @@ void BuzzoController::AddAllRemainingClientsToQueue()
                 Serial.println(_clients[i]->GetId().c_str());
                 
                 // Pretend that this participant has buzzed
-                ProcessBuzzCommand(_clients[i]->GetIpAddress());
+                uint8_t mac[6];
+                _clients[i]->GetMacAddress(mac);
+
+                ProcessBuzzCommand(mac);
             }
         }
     }
@@ -666,8 +830,11 @@ void BuzzoController::EndCurrentRespondantTurn(bool isCorrect)
                 Serial.print("Score: ");
                 Serial.println(client->GetScore());
 
-                SendScoreCommand(client->GetIpAddress(), client->GetScore());
-                SendResponseCommand(client->GetIpAddress(), isCorrect);
+                u_int8_t mac[6];
+                client->GetMacAddress(mac);
+
+                SendScoreCommand(mac, client->GetScore());
+                SendResponseCommand(mac, isCorrect);
             }
 
             if(isCorrect)
@@ -718,7 +885,10 @@ void BuzzoController::ResetButtonPress()
     {
         for(int i = 0; i < _clientCount; i++)
         {
-            SendResetCommand(_clients[i]->GetIpAddress(), true);
+            u_int8_t mac[6];
+            _clients[i]->GetMacAddress(mac);
+
+            SendResetCommand(mac, true);
         }
 
         _currentRespondant.assign("");
@@ -746,7 +916,10 @@ void BuzzoController::HoldResetButton()
 
             for(int i = 0; i < _clientCount; i++)
             {
-                SendSleepCommand(_clients[i]->GetIpAddress());
+                u_int8_t mac[6];
+                _clients[i]->GetMacAddress(mac);
+
+                SendSleepCommand(mac);
             }
 
         }
@@ -756,8 +929,11 @@ void BuzzoController::HoldResetButton()
             {
                 _clients[i]->SetScore(0);
                 
-                SendResetCommand(_clients[i]->GetIpAddress(), true);
-                SendScoreCommand(_clients[i]->GetIpAddress(), _clients[i]->GetScore());
+                u_int8_t mac[6];
+                _clients[i]->GetMacAddress(mac);                
+
+                SendResetCommand(mac, true);
+                SendScoreCommand(mac, _clients[i]->GetScore());
             }
 
             _currentRespondant.assign("");
@@ -776,7 +952,6 @@ void BuzzoController::ReleaseHoldResetButton()
 {
     if(_shouldSleep)
     {
-
         WiFi.disconnect(true);
 
         // esp_sleep_enable_ext0_wakeup(GPIO_NUM_32, LOW);
@@ -793,6 +968,9 @@ void BuzzoController::AdjustPreviousRespondant(bool isCorrect)
     {
         auto client = GetClient(_previousRespondant);
 
+        u_int8_t mac[6];
+        client->GetMacAddress(mac);
+
         if(client != 0)
         {        
             if(isCorrect)
@@ -802,8 +980,8 @@ void BuzzoController::AdjustPreviousRespondant(bool isCorrect)
                 Serial.print("New Score: ");
                 Serial.println(client->GetScore());
 
-                SendScoreCommand(client->GetIpAddress(), client->GetScore());
-                SendResponseCommand(client->GetIpAddress(), isCorrect);
+                SendScoreCommand(mac, client->GetScore());
+                SendResponseCommand(mac, isCorrect);
 
                 if(_currentRespondant.length() > 0)
                 {
@@ -814,11 +992,14 @@ void BuzzoController::AdjustPreviousRespondant(bool isCorrect)
                     int placeInQueue = 0;
                     for(int i = 0; i < _responseQueue.GetResponseCount(); i++)
                     {
-                        client = GetClient(_responseQueue.PeekNextResponse(i));
-                        if(client != 0 && client->IsActive())
+                        auto currentRespondantClient = GetClient(_responseQueue.PeekNextResponse(i));
+                        u_int8_t currentRespondantMac[6];
+                        currentRespondantClient->GetMacAddress(currentRespondantMac);
+
+                        if(currentRespondantClient != 0 && currentRespondantClient->IsActive())
                         {
                             placeInQueue++;
-                            SendQueueCommand(client->GetIpAddress(), placeInQueue);
+                            SendQueueCommand(currentRespondantMac, placeInQueue);
                         }
                     }  
                 }    
@@ -831,8 +1012,8 @@ void BuzzoController::AdjustPreviousRespondant(bool isCorrect)
                 Serial.println(client->GetScore());
 
                 // 2. Tell the previous respondant that they were incorrect
-                SendScoreCommand(client->GetIpAddress(), client->GetScore());
-                SendResponseCommand(client->GetIpAddress(), isCorrect);
+                SendScoreCommand(mac, client->GetScore());
+                SendResponseCommand(mac, isCorrect);
 
                 // 3. Tell all other buttons that they're in the queue again
                 int placeInQueue = 0;
@@ -842,7 +1023,7 @@ void BuzzoController::AdjustPreviousRespondant(bool isCorrect)
                     if(client != 0 && client->IsActive())
                     {
                         placeInQueue++;
-                        SendQueueCommand(client->GetIpAddress(), placeInQueue);
+                        SendQueueCommand(mac, placeInQueue);
                     }
                 }  
 
@@ -869,7 +1050,10 @@ void BuzzoController::SetAllClientsToSleep()
 {
     for(int i = 0; i < _clientCount; i++)
     {
-        SendResetCommand(_clients[i]->GetIpAddress(), true);
+        u_int8_t mac[6];
+        _clients[i]->GetMacAddress(mac);
+
+        SendSleepCommand(mac);
     }
 }
 
@@ -889,6 +1073,7 @@ void BuzzoController::BeginPauseButtonPress()
 void BuzzoController::EndPauseButtonPress()
 {
     Serial.println("UNPAUSE");
-        _isPaused = false;
+    _isPaused = false;
 }
 #pragma endregion
+

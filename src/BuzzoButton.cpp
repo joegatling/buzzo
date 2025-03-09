@@ -1,10 +1,6 @@
 
-#if defined(ESP32)
 #include <Wifi.h>
-#elif defined(ESP8266)
-#include <ESP8266WiFi.h>
-#endif
-
+#include <esp_now.h>
 #include <Arduino.h>
 #include <iostream>
 #include <vector>
@@ -15,6 +11,10 @@
 
 #include "BuzzoButton.h"
 #include "Commands.h"
+
+uint8_t receiverAddress[] = {0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF};
+
+//{0x08, 0xd1, 0xf9, 0x26, 0x37, 0xec};
 
 //#define DEMO_MODE
 #define FADEOUT_TIME 1500
@@ -388,6 +388,23 @@ void DisconnectedEnter(BuzzoButton* button)
     {
         button->_toneGenerator.DoSound(ToneGenerator::DISCONNECTED);
     }
+
+
+    if(memcmp(receiverAddress, "\xFF\xFF\xFF\xFF\xFF\xFF", sizeof(receiverAddress)) != 0)
+    {
+        if(esp_now_del_peer(receiverAddress) != ESP_OK)
+        {
+            Serial.println("Failed to delete peer");
+        }
+        else
+        {
+            Serial.println("Peer deleted");
+        }        
+    }
+    //Set receiverAddress to all 0xFF so that it broadcasts
+    memset(receiverAddress, 0xFF, sizeof(receiverAddress));
+    
+    
 }
 
 void DisconnectedUpdate(BuzzoButton* button)
@@ -398,10 +415,30 @@ void DisconnectedUpdate(BuzzoButton* button)
 
     for(int i = 0; i < button->_strip.PixelCount(); i++)
     {
-        bool isOn = ((millis() / 200) % button->_strip.PixelCount()) == i;
-        button->_strip.SetPixelColor(i, isOn ? RgbColor::LinearBlend(RgbColor(255,0,0), RgbColor(255,255,255), t) : RgbColor(0,0,0));
+        bool isOn = ((millis() / 50) % button->_strip.PixelCount()) == i;
+        button->_strip.SetPixelColor(i, isOn ? RgbColor::LinearBlend(RgbColor(255,255,255), RgbColor(255,255,255), t) : RgbColor(0,0,0));
     }    
     button->_strip.Show();
+
+    // If we have a receiver address, we're connected.
+    if(memcmp(receiverAddress, "\xFF\xFF\xFF\xFF\xFF\xFF", sizeof(receiverAddress)) != 0)
+    {
+        esp_now_peer_info_t peerInfo = {};
+        memcpy(peerInfo.peer_addr, receiverAddress, 6);
+        peerInfo.channel = 0;
+        peerInfo.encrypt = false;
+    
+        if(esp_now_add_peer(&peerInfo) != ESP_OK)
+        {
+            Serial.println("Failed to add peer");
+        }
+        else
+        {
+            Serial.println("Peer added");
+        }
+
+        button->SetState(BuzzoButton::IDLE);
+    }
 }
 
 void DisconnectedExit(BuzzoButton* button)
@@ -559,6 +596,37 @@ inline std::string trim(const std::string &s)
    return (wsback<=wsfront ? std::string() : std::string(wsfront,wsback));
 }
 
+#pragma region ESP-NOW Callbacks
+void OnDataSent(const uint8_t *mac_addr, esp_now_send_status_t status) 
+{
+    // Serial.print("Last Packet Sent Status: ");
+    // Serial.println(status == ESP_NOW_SEND_SUCCESS ? "Delivery Success" : "Delivery Fail");
+}
+
+void OnDataReceived(const uint8_t *mac, const uint8_t *data, int len) 
+{
+    len = min(len, PACKET_MAX_SIZE);
+
+    char packetBuffer[PACKET_MAX_SIZE + 1];
+    memcpy(packetBuffer, data, len);
+    packetBuffer[len] = 0;
+
+    if (memcmp(mac, "\xFF\xFF\xFF\xFF\xFF\xFF", 6) == 0) 
+    {
+        return;
+    }
+
+    BuzzoButton::GetInstance()->EnqueuePacketData(mac, packetBuffer);
+
+    // Serial.print("Last Packet Recv Data: ");
+    // for(int i = 0; i < len; i++)
+    // {
+    //     Serial.print((char)data[i]);
+    // }
+    // Serial.println();
+}
+#pragma endregion
+
 BuzzoButton* BuzzoButton::_instance = 0;
 BuzzoButton* BuzzoButton::GetInstance()
 {
@@ -571,7 +639,6 @@ BuzzoButton* BuzzoButton::GetInstance()
 }
 
 BuzzoButton::BuzzoButton() :
-_controllerIp(192,168,1,1),
 _currentScore(0),
 _canBuzz(false),
 _batteryLevel(100),
@@ -617,13 +684,46 @@ _isAnswerTimePaused(false)
     _button.SetEndHoldCallback([]() { OnButtonHoldRelease(BuzzoButton::GetInstance()); });    
     _button.SetLongPressDuration(3000);
 
-    udp.begin(PORT);
+    // udp.begin(PORT);
+    for(int i = 0; i < PACKET_MAX_QUEUE; i++)
+    {
+        memset(packetQueue[i].mac, 0, sizeof(packetQueue[i].mac));
+        memset(packetQueue[i].packetBuffer, 0, sizeof(packetQueue[i].packetBuffer));
+    }
+
+    _packetQueueCount = 0;
+    _packetQueueIndex = 0;
+
 
     memset(_uniqueId, '\0', sizeof(_uniqueId));
-    strcpy(_uniqueId, WiFi.macAddress().c_str());
+    strncpy(_uniqueId, WiFi.macAddress().c_str(), sizeof(_uniqueId) - 1);
     Serial.print("Unique ID: ");
     Serial.println(_uniqueId);
 
+    WiFi.mode(WIFI_STA);
+    WiFi.channel(0);
+
+    if(esp_now_init() != ESP_OK)
+    {
+        Serial.println("Error initializing ESP-NOW");
+    }
+
+    esp_now_register_recv_cb(OnDataReceived);
+    esp_now_register_send_cb(OnDataSent);
+
+    esp_now_peer_info_t peerInfo = {};
+    memcpy(peerInfo.peer_addr, receiverAddress, 6);
+    peerInfo.channel = 0;
+    peerInfo.encrypt = false;
+
+    if(esp_now_add_peer(&peerInfo) != ESP_OK)
+    {
+        Serial.println("Failed to add peer");
+    }
+    else
+    {
+        Serial.println("Peer added");
+    }    
 }
 
 void BuzzoButton::Initialize()
@@ -663,12 +763,13 @@ void BuzzoButton::Update()
     _wasScoreUpdated = false;
 
     //Serial.println("State Update End");
-    if(_currentState != BuzzoButton::DISCONNECTED && _currentState != BuzzoButton::NONE && _currentState != BuzzoButton::GO_TO_SLEEP)
+    if(_currentState != BuzzoButton::NONE && _currentState != BuzzoButton::GO_TO_SLEEP)
     {
-        ProcessPacket();
+        ProcessPacketQueue();
 
         // Periodically send a register command
-        if(millis() - _lastSendTime > PING_INTERVAL || _lastSendTime == 0) 
+        long pingInterval = _currentState == BuzzoButton::DISCONNECTED ? DISCONNECTED_PING_INTERVAL : PING_INTERVAL;
+        if(millis() - _lastSendTime > pingInterval || _lastSendTime == 0) 
         {
             SendRegisterCommand(_uniqueId, _batteryLevel);
             _lastSendTime = millis();
@@ -676,20 +777,46 @@ void BuzzoButton::Update()
     }
 }
 
-
-void BuzzoButton::ProcessPacket()
+void BuzzoButton::ProcessPacketQueue()
 {
-    int packetSize = udp.parsePacket();
-    if (packetSize) 
-    {    
-        // Serial.printf("Received packet of size %d from %s:%d\n \n", 
-        // packetSize, 
-        // udp.remoteIP().toString().c_str(), 
-        // udp.remotePort());
+    if(_packetQueueCount > 0)
+    {
+        uint8_t mac[6];
+        memcpy(mac, packetQueue[_packetQueueIndex].mac, sizeof(mac));
+        
+        char buffer[PACKET_MAX_SIZE + 1];
+        
+        memcpy(buffer, packetQueue[_packetQueueIndex].packetBuffer, PACKET_MAX_SIZE);
+        buffer[PACKET_MAX_SIZE] = 0;
 
-        // read the packet into packetBufffer
-        int n = udp.read(packetBuffer, PACKET_MAX_SIZE);
-        packetBuffer[n] = 0;
+        ProcessPacket(mac, buffer);
+
+        _packetQueueCount--;
+        _packetQueueIndex = (_packetQueueIndex + 1) % PACKET_MAX_QUEUE;
+    }
+}
+
+
+void BuzzoButton::ProcessPacket(const uint8_t *mac, const char* packetBuffer)
+{
+    if(_currentState == BuzzoButton::NONE && _currentState == BuzzoButton::GO_TO_SLEEP)
+    {
+        return;
+    }      
+    
+    
+
+    // int packetSize = udp.parsePacket();
+    // if (packetSize) 
+    // {    
+    //     // Serial.printf("Received packet of size %d from %s:%d\n \n", 
+    //     // packetSize, 
+    //     // udp.remoteIP().toString().c_str(), 
+    //     // udp.remotePort());
+
+    //     // read the packet into packetBufffer
+        // int n = udp.read(packetBuffer, PACKET_MAX_SIZE);
+        // packetBuffer[n] = 0;
 
         Serial.print("Received: ");
         Serial.println(packetBuffer); 
@@ -759,6 +886,10 @@ void BuzzoButton::ProcessPacket()
             {
                 if(paramCount > 0)
                 {
+                    // We should assume that anything that sends us a score command is the Buzzo Controller.
+                    // So we need to remember it as the receiver for any new message.
+                    memcpy(receiverAddress, mac, 6);
+
                     ProcessScoreCommand(atoi(params[0].c_str()));
                 }
                 else
@@ -803,7 +934,7 @@ void BuzzoButton::ProcessPacket()
         {
             Serial.println("ERROR");
         }
-    }
+    //}
 }
 
 
@@ -823,6 +954,21 @@ void BuzzoButton::DisableLightsAndSound()
     _strip.Show();
 
     _toneGenerator.ClearSoundQueue();
+}
+
+void BuzzoButton::EnqueuePacketData(const uint8_t *mac, const char* packetBuffer)
+{
+    if(_packetQueueCount < PACKET_MAX_QUEUE)
+    {
+        unsigned int index = (_packetQueueIndex + _packetQueueCount) % PACKET_MAX_QUEUE;
+        
+        memcpy(packetQueue[index].mac, mac, sizeof(packetQueue[index].mac));
+        strncpy(packetQueue[index].packetBuffer, packetBuffer, PACKET_MAX_SIZE);
+        packetQueue[index].packetBuffer[PACKET_MAX_SIZE] = '\0'; // Ensure null-termination
+
+
+        _packetQueueCount++;
+    }
 }
 
 void BuzzoButton::ShowBatteryLevelOnButton()
@@ -919,22 +1065,79 @@ void BuzzoButton::ProcessSleepCommand()
 
 void BuzzoButton::SendRegisterCommand(char* id, unsigned int battery)
 {
+    // Serial.println("Sending register command");
+    // for(int i = 0; i < 6; i++)
+    // {
+    //     Serial.print(receiverAddress[i], HEX);
+    //     Serial.print(":");
+    // }
+    // Serial.println();
+
     battery = constrain(battery, 0, 100);
 
-    udp.beginPacket(_controllerIp, PORT);
-    udp.print(COMMAND_REGISTER);
-    udp.print(" ");
-    udp.print(id);
-    udp.print(" ");
-    udp.print(battery);
-    udp.endPacket();
+    String message = String(COMMAND_REGISTER) + " " + id + " " + battery;
+    auto result = esp_now_send(receiverAddress, (uint8_t*)message.c_str(), message.length());
+
+    // Serial.print("Result:");
+
+    // switch(result)
+    // {
+    //     case ESP_OK:
+    //         Serial.print("OK");
+    //         break;
+    //     case ESP_ERR_ESPNOW_NOT_INIT:
+    //         Serial.print("ESP_ERR_ESPNOW_NOT_INIT");
+    //         break;
+    //     case ESP_ERR_ESPNOW_ARG:
+    //         Serial.print("ESP_ERR_ESPNOW_ARG");
+    //         break;
+    //     case ESP_ERR_ESPNOW_INTERNAL:
+    //         Serial.print("ESP_ERR_ESPNOW_INTERNAL");
+    //         break;
+    //     case ESP_ERR_ESPNOW_NO_MEM:
+    //         Serial.print("ESP_ERR_ESPNOW_NO_MEM");
+    //         break;
+    //     case ESP_ERR_ESPNOW_NOT_FOUND:
+    //         Serial.print("ESP_ERR_ESPNOW_NOT_FOUND");
+    //         break;
+    //     case ESP_ERR_ESPNOW_IF:
+    //         Serial.print("ESP_ERR_ESPNOW_IF");
+    //         break;
+    //     default:
+    //         Serial.print("Unknown: ");
+    //         Serial.print(result);
+    //         break;
+    // }
+
+    // Serial.println();
+
+    if(result == ESP_ERR_ESPNOW_NOT_FOUND)
+    {
+        SetState(BuzzoButton::DISCONNECTED);
+    }
+
+    // udp.beginPacket(_controllerIp, PORT);
+    // udp.print(COMMAND_REGISTER);
+    // udp.print(" ");
+    // udp.print(id);
+    // udp.print(" ");
+    // udp.print(battery);
+    // udp.endPacket();
 
     
 }
 
 void BuzzoButton::SendBuzzCommand()
 {
-    udp.beginPacket(_controllerIp, PORT);
-    udp.print(COMMAND_BUZZ);
-    udp.endPacket();
+//     udp.beginPacket(_controllerIp, PORT);
+//     udp.print(COMMAND_BUZZ);
+//     udp.endPacket();
+
+    String message = String(COMMAND_BUZZ);
+    auto result = esp_now_send(receiverAddress, (uint8_t*)message.c_str(), message.length());
+
+    if(result == ESP_ERR_ESPNOW_NOT_FOUND)
+    {
+        SetState(BuzzoButton::DISCONNECTED);
+    }
 }
