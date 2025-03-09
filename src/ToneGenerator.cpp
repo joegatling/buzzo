@@ -4,6 +4,8 @@
     #define SPEAKER_PIN 15
 #elif defined(BUZZO_BUTTON_ADAFRUIT)
     #define SPEAKER_PIN 9
+#else
+    #define SPEAKER_PIN 1
 #endif
 
 ToneGenerator::ToneGenerator():

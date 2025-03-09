@@ -20,6 +20,9 @@
 #elif defined(BUZZO_BUTTON_ADAFRUIT)
     #define BUZZER_BUTTON_PIN 6
     #define NEOPIXEL_PIN 5
+#else
+    #define BUZZER_BUTTON_PIN 1
+    #define NEOPIXEL_PIN 2
 #endif
 
 #define UNIQUE_ID_LEN 32
