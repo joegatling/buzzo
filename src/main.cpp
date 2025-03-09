@@ -100,34 +100,26 @@ unsigned int GetBatteryLevel()
 
 void Sleep()
 {
-    #if defined(ESP8266)
-      return;
-    #endif
+
     
-    WiFi.disconnect(true);
 
     #if BUZZO_BUTTON
-      BuzzoButton::GetInstance()->DisableLightsAndSound();
+      BuzzoButton::GetInstance()->SetState(BuzzoButton::GO_TO_SLEEP);
+      return;
     #else
+      WiFi.disconnect(true);
       digitalWrite(LED_PIN, LOW);
+      delay(100);
+      esp_sleep_enable_ext0_wakeup(GPIO_NUM_14, LOW);
+      esp_deep_sleep_start();
     #endif
 
-    delay(100);
 
-    #if defined(BUZZO_BUTTON_ALIEXPRESS)
-      esp_sleep_enable_ext0_wakeup(GPIO_NUM_32, LOW);
-    #elif defined(BUZZO_BUTTON_ADAFRUIT)
-      esp_sleep_enable_ext0_wakeup(GPIO_NUM_9, LOW);
-    #endif  
-
-    #if BUZZO_CONTROLLER
-      esp_sleep_enable_ext0_wakeup(GPIO_NUM_14, LOW);
-      //esp_sleep_enable_ext0_wakeup(GPIO_NUM_15, LOW);
-    #endif    
-
-    #if defined(ESP32)
-      esp_deep_sleep_start();
-    #endif      
+    // #if defined(BUZZO_BUTTON_ALIEXPRESS)
+    //   esp_sleep_enable_ext0_wakeup(GPIO_NUM_32, LOW);
+    // #elif defined(BUZZO_BUTTON_ADAFRUIT)
+    //   esp_sleep_enable_ext0_wakeup(GPIO_NUM_6, LOW);
+    // #endif    
 }
 
 

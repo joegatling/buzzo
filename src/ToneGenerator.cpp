@@ -192,6 +192,11 @@ void ToneGenerator::Update()
 
 }
 
+bool ToneGenerator::IsPlayingSound()
+{
+    return _soundQueueCount > 0 || _currentNote > NOTE_NONE;
+}
+
 void ToneGenerator::ClearSoundQueue()
 {
     _soundQueueCount = 0;

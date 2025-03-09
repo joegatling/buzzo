@@ -36,6 +36,8 @@ class ToneGenerator
     
     void ClearSoundQueue();
 
+    bool IsPlayingSound();
+
     private:
 
     void EnqueueNote(unsigned int note, unsigned int duration);

@@ -32,6 +32,7 @@ class BuzzoButton
         enum StateId
         {
             NONE = 0,
+
             IDLE, 
             ANSWERING,
             CORRECT,
@@ -39,6 +40,8 @@ class BuzzoButton
             QUEUED,
             SELECTED,
             DISCONNECTED,
+            GO_TO_SLEEP,            
+            
             STATE_COUNT
         };
 
@@ -108,7 +111,11 @@ class BuzzoButton
 
         friend void SelectedEnter(BuzzoButton* button);
         friend void SelectedUpdate(BuzzoButton* button);
-        friend void SelectedExit(BuzzoButton* button);      
+        friend void SelectedExit(BuzzoButton* button);   
+        
+        friend void GoToSleepEnter(BuzzoButton* button);
+        friend void GoToSleepUpdate(BuzzoButton* button);
+        friend void GoToSleepExit(BuzzoButton* button);          
 
         friend void OnButtonPress(BuzzoButton* button);
 

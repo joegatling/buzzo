@@ -441,6 +441,70 @@ void SelectedExit(BuzzoButton* button)
 {
 }
 
+void GoToSleepEnter(BuzzoButton* button)
+{
+    button->DisableLightsAndSound();
+    button->GetToneGenerator()->DoSound(ToneGenerator::POWER_OFF);
+
+    button->_strip.SetLuminance(255);
+    // uint16_t hue = (millis() * 50) % 0xFFFF;
+    // button->_strip.rainbow(hue,1,255, 32);
+    for(int i = 0; i < button->_strip.PixelCount(); i++)
+    {            
+        button->_strip.SetPixelColor(i, RgbColor(255,0,255));                 
+    }
+    button->_strip.Show();    
+}
+
+void GoToSleepUpdate(BuzzoButton* button)
+{
+    float timeInState = (float)(millis() - button->_stateEnterTime);
+    float t = max(0.0, min(1.0, timeInState / 200.0));
+    uint8_t brightness = (1.0f - t) * 255;
+    button->_strip.SetLuminance(brightness);
+    for(int i = 0; i < button->_strip.PixelCount(); i++)
+    {            
+        button->_strip.SetPixelColor(i, RgbColor(255,0,255));                 
+    }    
+    button->_strip.Show();    
+
+    if(button->GetToneGenerator()->IsPlayingSound())
+    {
+        return;
+    }
+
+    if(button->_button.IsButtonDown())
+    {
+        return;
+    }
+
+    // if(digitalRead(BUZZER_BUTTON_PIN) == LOW)
+    // {
+    //     return;
+    // }
+
+    if(timeInState < 200)
+    {
+        return;
+    }
+    
+    button->DisableLightsAndSound();    
+
+    WiFi.disconnect(true);
+
+    delay(100);
+
+    #if defined(BUZZO_BUTTON_ALIEXPRESS)
+        esp_sleep_enable_ext0_wakeup(GPIO_NUM_32, LOW);
+    #elif defined(BUZZO_BUTTON_ADAFRUIT)
+        esp_sleep_enable_ext0_wakeup(GPIO_NUM_6, LOW);
+    #endif
+    
+    esp_deep_sleep_start();              
+}
+
+void GoToSleepExit(BuzzoButton* button)
+{}
 
 #pragma endregion
 
@@ -469,26 +533,23 @@ void OnButtonPress(BuzzoButton* button)
 
 void OnButtonHold(BuzzoButton* button)
 {
-    button->DisableLightsAndSound();
-    button->SetState(BuzzoButton::NONE);
-
-    button->GetToneGenerator()->DoSound(ToneGenerator::POWER_OFF);
+    button->SetState(BuzzoButton::GO_TO_SLEEP);
 }
 
 void OnButtonHoldRelease(BuzzoButton* button)
 {
-    WiFi.disconnect(true);
-    button->SetState(BuzzoButton::NONE);
+    // WiFi.disconnect(true);
+    // button->SetState(BuzzoButton::NONE);
         
-    delay(100);
+    // delay(100);
 
-    #if defined(BUZZO_BUTTON_ALIEXPRESS)
-        esp_sleep_enable_ext0_wakeup(GPIO_NUM_32, LOW);
-    #elif defined(BUZZO_BUTTON_ADAFRUIT)
-        esp_sleep_enable_ext0_wakeup(GPIO_NUM_9, LOW);
-    #endif
+    // #if defined(BUZZO_BUTTON_ALIEXPRESS)
+    //     esp_sleep_enable_ext0_wakeup(GPIO_NUM_32, LOW);
+    // #elif defined(BUZZO_BUTTON_ADAFRUIT)
+    //     esp_sleep_enable_ext0_wakeup(GPIO_NUM_6, LOW);
+    // #endif
     
-    esp_deep_sleep_start();   
+    // esp_deep_sleep_start();   
 }
 
 inline std::string trim(const std::string &s)
@@ -549,6 +610,7 @@ _isAnswerTimePaused(false)
     _states[QUEUED] = new BuzzoButtonState(&QueuedEnter, &QueuedUpdate, &QueuedExit);
     _states[SELECTED] = new BuzzoButtonState(&SelectedEnter, &SelectedUpdate, &SelectedExit);
     _states[DISCONNECTED] = new BuzzoButtonState(&DisconnectedEnter, &DisconnectedUpdate, &DisconnectedExit);
+    _states[GO_TO_SLEEP] = new BuzzoButtonState(&GoToSleepEnter, &GoToSleepUpdate, &GoToSleepExit);
 
     _button.SetBeginPressCallback([]() { OnButtonPress(BuzzoButton::GetInstance()); });    
     _button.SetBeginHoldCallback([]() { OnButtonHold(BuzzoButton::GetInstance()); });    
@@ -601,7 +663,7 @@ void BuzzoButton::Update()
     _wasScoreUpdated = false;
 
     //Serial.println("State Update End");
-    if(_currentState != BuzzoButton::DISCONNECTED && _currentState != BuzzoButton::NONE)
+    if(_currentState != BuzzoButton::DISCONNECTED && _currentState != BuzzoButton::NONE && _currentState != BuzzoButton::GO_TO_SLEEP)
     {
         ProcessPacket();
 
@@ -851,9 +913,7 @@ void BuzzoButton::ProcessScoreCommand(int score)
 
 void BuzzoButton::ProcessSleepCommand()
 {
-    DisableLightsAndSound();
-    delay(100);
-    OnButtonHoldRelease(this);
+    SetState(BuzzoButton::GO_TO_SLEEP);
 }
 
 
