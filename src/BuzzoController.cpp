@@ -865,14 +865,19 @@ void BuzzoController::AdjustPreviousRespondant(bool isCorrect)
     // }
 }
 
-void BuzzoController::ReleaseHoldIncorrectButton()
+void BuzzoController::SetAllClientsToSleep()
 {
-    _isInAdjustMode = false;
-
     for(int i = 0; i < _clientCount; i++)
     {
         SendResetCommand(_clients[i]->GetIpAddress(), true);
     }
+}
+
+void BuzzoController::ReleaseHoldIncorrectButton()
+{
+    _isInAdjustMode = false;
+
+    SetAllClientsToSleep();
 }
 
 void BuzzoController::BeginPauseButtonPress()

@@ -22,7 +22,7 @@ Adafruit_MAX17048 maxlipo;
   IPAddress subnet(255,255,255,0);  
 
   #define DISCONNECTED_SLEEP_TIMER  (4 * 60 * 1000)
-  #define CONNECTED_SLEEP_TIMER     (20 * 60 * 1000)
+  #define CONNECTED_SLEEP_TIMER     (40 * 60 * 1000)
 
   #define LOW_POWER_PIN   27
 
@@ -53,6 +53,7 @@ unsigned long lastConnectionCheckTime = 0;
 unsigned long wakeTime = 0;
 
 unsigned long batteryReportInterval = 0;
+unsigned long lastClientReportTime = 0;
 
 float mapFloat(float x, float in_min, float in_max, float out_min, float out_max) 
 {
@@ -107,6 +108,10 @@ void Sleep()
       BuzzoButton::GetInstance()->SetState(BuzzoButton::GO_TO_SLEEP);
       return;
     #else
+      BuzzoController::GetInstance()->SetAllClientsToSleep();
+
+      delay(50);
+
       WiFi.disconnect(true);
       digitalWrite(LED_PIN, LOW);
       delay(100);
@@ -233,8 +238,12 @@ void loop()
   }
 
   //Serial.println(GetBatteryLevel());
-
-  //Serial.println(BuzzoController::GetInstance()->GetActiveClientCount());
+  if(millis() - lastClientReportTime > 5000)
+  {
+    lastClientReportTime = millis();
+    Serial.print("Clients: ");
+    Serial.println(BuzzoController::GetInstance()->GetActiveClientCount());
+  }
 
 }
 

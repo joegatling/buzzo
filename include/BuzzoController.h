@@ -55,6 +55,8 @@ class BuzzoController
 
         void AdjustPreviousRespondant(bool isCorrect);
 
+        void SetAllClientsToSleep();
+
         unsigned long TimeSinceLastButtonPress() { return millis() - _lastButtonPressTime; } 
 
         int GetActiveClientCount();
