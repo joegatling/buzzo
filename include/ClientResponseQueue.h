@@ -7,15 +7,18 @@
 enum RespondantStatus
 {
     NONE,
-    CURRENTLY_RESPONDING,
     INCORRECT,
-    CORRECT
+    CORRECT,
+    ANSWERING,
+    PENDING
 }
 
 class ClientResponseQueue
 {
     public:
         ClientResponseQueue();
+        
+        void Reset();
 
         void EnqueueRespondant(std::string respondantId);
 
@@ -26,25 +29,23 @@ class ClientResponseQueue
         bool HasPreviousRespondant();
 
         void MoveToNextRespondant();
-        void CurrentRespondnat(bool isCorrect);
+        void EndRound();
 
         std::string GetPreviousRespondant();
         std::string GetCurrentRespondant();
         std::string GetNextRespondant();
         
-
-        bool IsIncorrect(std::string respondantId);
-        bool IsCorrect(std::string respondantId);
-        bool IsCurrentRespondant(std::string respondantId);
-        bool IsInQueue(std::string respondantId);
-
         RespondantStatus GetRespondantStatus(std::string respondantId)
+
+        bool IsRoundOver();
 
     private:
         unsigned int _currentIndex;
         unsigned int _respondantCount;
 
         std::string _queue[MAX_QUEUE_LENGTH];
+
+        bool _isRoundOver;
     
 
 }
