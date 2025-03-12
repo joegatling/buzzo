@@ -69,14 +69,16 @@ _correctButton(CORRECT_BUTTON_PIN),
 _incorrectButton(INCORRECT_BUTTON_PIN),
 _resetButton(RESET_BUTTON_PIN),
 _pauseButton(PAUSE_BUTTON_PIN),
-_responseQueue(MAX_CLIENTS),
-_isAcceptingResponses(true),
+//_responseQueue(MAX_CLIENTS),
+//_isAcceptingResponses(true),
 _isReset(true),
 _shouldSleep(false),
 _isPaused(false),
 _isInAdjustMode(false)
 {
-    _currentRespondant.assign("");
+    //_currentRespondant.assign("");
+    _clientResponses.Reset();
+    
     _clientCount = 0;
 
     for(int i = 0; i < PACKET_MAX_QUEUE; i++)
@@ -105,7 +107,7 @@ _isInAdjustMode(false)
     esp_now_register_send_cb(OnControllerDataSent);
     esp_now_register_recv_cb(OnControllerDataReceived);
 
-    _participantCount = 0;
+    //_participantCount = 0;
 
     _lastMillis = millis();
 
@@ -416,9 +418,13 @@ void BuzzoController::ProcessBuzzCommand(const uint8_t *mac)
 
             if(client->GetScore() < MAX_SCORE)
             {
-                if(!_responseQueue.ContainsResponse(client->GetId()))
+                auto respondantStatus = _clientResponses.GetRespondantStatus(client->GetId());
+
+                if(!respondantStatus == RespondantStatus::NONE)
                 {
-                    _responseQueue.EnqueueResponse(client->GetId());
+                    _clientResponses.EnqueueRespondant(client->GetId());
+
+                    //_responseQueue.EnqueueResponse(client->GetId());
                 
                     _participants[_participantCount] = client->GetId();
                     _participantCount++;
@@ -446,91 +452,46 @@ void BuzzoController::SendAnswerCommand(const uint8_t *mac, int timer, int total
 {
     String message = String(COMMAND_ANSWER) + " " + timer + " " + totalTime;
     esp_now_send(mac, (uint8_t*)message.c_str(), message.length());
-
-    // udp.beginPacket(ip, PORT);
-    // udp.print(COMMAND_ANSWER);
-    // udp.print(" ");
-    // udp.print(timer);
-    // udp.print(" ");
-    // udp.print(totalTime);
-    // udp.endPacket();
 }
 
 void BuzzoController::SendQueueCommand(const uint8_t *mac, int placeInQueue)
 {
     String message = String(COMMAND_QUEUE) + " " + placeInQueue;
     esp_now_send(mac, (uint8_t*)message.c_str(), message.length());
-
-    // udp.beginPacket(ip, PORT);
-    // udp.print(COMMAND_QUEUE);
-    // udp.print(" ");
-    // udp.print(placeInQueue);
-    // udp.endPacket();
 }
 
 void BuzzoController::SendResponseCommand(const uint8_t *mac, bool isCorrect)
 {
     String message = String(isCorrect ? COMMAND_CORRECT_RESPONSE : COMMAND_INCORRECT_RESPONSE);
     esp_now_send(mac, (uint8_t*)message.c_str(), message.length());
-
-    // udp.beginPacket(ip, PORT);
-    // udp.print(isCorrect ? COMMAND_CORRECT_RESPONSE : COMMAND_INCORRECT_RESPONSE);
-    // udp.endPacket();
-
 }
 
 void BuzzoController::SendResetCommand(const uint8_t *mac, bool canBuzz)
 {
-    // udp.beginPacket(ip, PORT);
-    // udp.print(COMMAND_RESET);
-    // udp.print(" ");
-    // udp.print(canBuzz);    
-    // udp.endPacket();
-
     String message = String(COMMAND_RESET) + " " + canBuzz;
     esp_now_send(mac, (uint8_t*)message.c_str(), message.length());
 }
 
 void BuzzoController::SendSelectCommand(const uint8_t *mac)
 {
-    // udp.beginPacket(ip, PORT);
-    // udp.print(COMMAND_SELECT);
-    // udp.endPacket();
-
     String message = String(COMMAND_SELECT);
     esp_now_send(mac, (uint8_t*)message.c_str(), message.length());
 }
 
 void BuzzoController::SendErrorCommand(const uint8_t *mac, int errorCode)
 {
-    // udp.beginPacket(ip, PORT);
-    // udp.print(COMMAND_ERROR);
-    // udp.print(" ");
-    // udp.print(errorCode);    
-    // udp.endPacket();
-
     String message = String(COMMAND_ERROR) + " " + errorCode;
     esp_now_send(mac, (uint8_t*)message.c_str(), message.length());
 }
 
 void BuzzoController::SendScoreCommand(const uint8_t *mac, int score = 0)
 {
-    // udp.beginPacket(ip, PORT);
-    // udp.print(COMMAND_SCORE);
-    // udp.print(" ");
-    // udp.print(score);    
-    // udp.endPacket();
-
     String message = String(COMMAND_SCORE) + " " + score;
     esp_now_send(mac, (uint8_t*)message.c_str(), message.length());
 }
 
 void BuzzoController::SendSleepCommand(const uint8_t *mac)
 {
-    // udp.beginPacket(ip, PORT);
-    // udp.print(COMMAND_SLEEP);
-    // udp.endPacket();
-
     String message = String(COMMAND_SLEEP);
     esp_now_send(mac, (uint8_t*)message.c_str(), message.length());
 }
@@ -734,20 +695,29 @@ int BuzzoController::GetActiveClientsYetToPlayCount()
         if(_clients[i]->IsActive())
         {
             bool hasParticipated = false;
-            
-            for(int j = 0; j < _participantCount; j++)
-            {
-                if(_participants[j].compare(_clients[i]->GetId()) == 0)
-                {
-                    hasParticipated = true;
-                    break;
-                }
-            }            
 
-            if(!hasParticipated)
+            auto respondantStatus = _clientResponses.GetRespondantStatus();
+
+            if(respondantStatus == RespondantStatus::NONE)
             {
-                count++;
+                continue;
             }
+
+            count++;
+            
+            // for(int j = 0; j < _participantCount; j++)
+            // {
+            //     if(_participants[j].compare(_clients[i]->GetId()) == 0)
+            //     {
+            //         hasParticipated = true;
+            //         break;
+            //     }
+            // }            
+
+            // if(!hasParticipated)
+            // {
+            //     count++;
+            // }
         }
     }
 
@@ -776,16 +746,21 @@ void BuzzoController::AddAllRemainingClientsToQueue()
 
         if(_clients[i]->IsActive())
         {
-            bool hasParticipated = false;
-            
-            for(int j = 0; j < _participantCount; j++)
+            auto respondantStatus = _clientResponses.GetRespondantStatus();
+
+            if(respondantStatus != RespondantStatus::NONE)
             {
-                if(_participants[j].compare(_clients[i]->GetId()) == 0)
-                {
-                    hasParticipated = true;
-                    break;
-                }
-            }            
+                continue;
+            }
+            
+            // for(int j = 0; j < _participantCount; j++)
+            // {
+            //     if(_participants[j].compare(_clients[i]->GetId()) == 0)
+            //     {
+            //         hasParticipated = true;
+            //         break;
+            //     }
+            // }            
 
             if(!hasParticipated)
             {

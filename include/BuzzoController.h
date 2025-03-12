@@ -8,7 +8,8 @@
 #include <SimpleButton.h>
 
 #include "ButtonClientInfo.h"
-#include "ResponseQueue.h"
+//#include "ResponseQueue.h"
+#include "ClientResponseQueue.h"
 
 #define PACKET_MAX_SIZE 256
 #define PACKET_MAX_QUEUE 4
@@ -132,7 +133,8 @@ class BuzzoController
 
         unsigned long _autoResestTime = 0;
 
-        bool _isAcceptingResponses = true;
+        // Replace with ClientResponseQueue
+        //bool _isAcceptingResponses = true;
         bool _isReset = false;
         bool _shouldSleep = false;
         bool _isInAdjustMode = false;
@@ -145,12 +147,14 @@ class BuzzoController
         SimpleButton _resetButton;
         SimpleButton _pauseButton;
 
-        ResponseQueue<std::string> _responseQueue;
-        std::string _currentRespondant;
-        std::string _previousRespondant;
-        bool _previousRespondantWasCorrect = false;
+        //ResponseQueue<std::string> _responseQueue;
+        ClientResponseQueue _clientResponses;
+        
+        // std::string _currentRespondant;
+        // std::string _previousRespondant;
+        //bool _previousRespondantWasCorrect = false;
 
-        std::string _participants[MAX_CLIENTS];
-        unsigned int _participantCount;
+        //std::string _participants[MAX_CLIENTS];
+        //unsigned int _participantCount;
 
 };
