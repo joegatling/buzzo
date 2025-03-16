@@ -81,15 +81,15 @@ unsigned int GetBatteryLevel()
     batteryPercentage = max(0.0f, batteryPercentage);
     batteryPercentage = min(100.0f, batteryPercentage);
 
-    if(millis() - batteryReportInterval > 5000)
-    {
-      batteryReportInterval = millis();
-      Serial.print("Battery: ");
-      Serial.print(voltage);
-      Serial.print("v (");
-      Serial.print(batteryPercentage);    
-      Serial.println("%)");
-    }
+    // if(millis() - batteryReportInterval > 5000)
+    // {
+    //   batteryReportInterval = millis();
+    //   Serial.print("Battery: ");
+    //   Serial.print(voltage);
+    //   Serial.print("v (");
+    //   Serial.print(batteryPercentage);    
+    //   Serial.println("%)");
+    // }
 
     return (unsigned int)batteryPercentage;
   #endif
