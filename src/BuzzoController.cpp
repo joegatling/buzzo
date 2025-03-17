@@ -13,7 +13,7 @@
 #define RESPONSE_TIME_LIMIT     20
 #define TIME_BETWEEN_RESPONDERS (1 * 1000)
 #define RESPONDANT_PING_TIME    500
-#define AUTO_RESET_TIME         5000
+#define AUTO_RESET_TIME         10000
 
 #define MAX_SCORE 6
 
@@ -76,7 +76,7 @@ _shouldSleep(false),
 _isPaused(false),
 _isInAdjustMode(false)
 {
-    //_currentRespondant.assign("");
+    //_clientResponses.GetCurrentRespondant().assign("");
     _clientResponses.Reset();
     
     _clientCount = 0;
@@ -122,7 +122,6 @@ void BuzzoController::Initialize()
 
     _incorrectButton.SetEndPressCallback([](){ BuzzoController::GetInstance()->EndCurrentRespondantTurn(false); });
     _incorrectButton.SetBeginHoldCallback([](){ BuzzoController::GetInstance()->AdjustPreviousRespondant(false); });
-    _incorrectButton.SetEndHoldCallback([](){ BuzzoController::GetInstance()->ReleaseHoldIncorrectButton(); });
     _incorrectButton.SetLongPressDuration(1500);
     
     _resetButton.SetEndPressCallback([](){ BuzzoController::GetInstance()->ResetButtonPress(); });    
@@ -419,23 +418,91 @@ void BuzzoController::ProcessBuzzCommand(const uint8_t *mac)
             if(client->GetScore() < MAX_SCORE)
             {
                 auto respondantStatus = _clientResponses.GetRespondantStatus(client->GetId());
+                bool thisClientShouldAnswer = false;
 
-                if(!respondantStatus == RespondantStatus::NONE)
+                Serial.print("This respondant status: ");
+                // Print the status enum name as a human readable string
+                switch(respondantStatus)
                 {
-                    _clientResponses.EnqueueRespondant(client->GetId());
+                    case RespondantStatus::NONE:
+                        Serial.println("NONE");
+                        break;
+                    case RespondantStatus::INCORRECT:
+                        Serial.println("INCORRECT");
+                        break;
+                    case RespondantStatus::CORRECT:
+                        Serial.println("CORRECT");
+                        break;
+                    case RespondantStatus::ANSWERING:
+                        Serial.println("ANSWERING");
+                        break;
+                    case RespondantStatus::QUEUED:
+                        Serial.println("QUEUED");
+                        break;
+                }
+
+                
+                if(respondantStatus == RespondantStatus::NONE)
+                {
+                    Serial.print("Has current respondant: ");
+                    Serial.println(_clientResponses.HasCurrentRespondant() ? "YES" : "NO");
+
+                    Serial.print("Is round over: ");
+                    Serial.println(_clientResponses.IsRoundOver() ? "YES" : "NO");
+
+                    thisClientShouldAnswer = _clientResponses.EnqueueRespondant(client->GetId());
 
                     //_responseQueue.EnqueueResponse(client->GetId());
                 
-                    _participants[_participantCount] = client->GetId();
-                    _participantCount++;
+                    // _participants[_participantCount] = client->GetId();
+                    // _participantCount++;
+
+                    Serial.print("Can respondant answer: ");
+                    Serial.println(thisClientShouldAnswer ? "YES" : "NO");
+    
+                    Serial.print("Pending Respondants: ");
+                    Serial.println(_clientResponses.GetPendingRespondantCount());
+    
+                    // If there is more than one in the response queue, tell this button that 
+                    // it needs to wait before it can respond.
+                    if(thisClientShouldAnswer)
+                    {
+                        Serial.println("Setting response delay...");
+                        _nextResponderDelayStartTime = millis();
+                    }
+                    else
+                    {
+                        Serial.println("Sending queue command...");
+                        SendQueueCommand(mac, _clientResponses.GetPendingRespondantCount());
+                    }                    
+                }
+                else if(respondantStatus == RespondantStatus::INCORRECT)
+                {
+                    SendResponseCommand(mac, false);
+                }
+                else if(respondantStatus == RespondantStatus::CORRECT)
+                {
+                    SendResponseCommand(mac, true);
+                }
+                else if(respondantStatus == RespondantStatus::QUEUED)
+                {
+                    int placeInQueue = _clientResponses.GetQueuedRespondantIndex(client->GetId());
+
+                    if(placeInQueue >= 0)
+                    {
+                        SendQueueCommand(mac, placeInQueue);
+                    }
+                    else
+                    {
+                        SendQueueCommand(mac, MAX_QUEUE_LENGTH);
+                    }
                 }
 
-                // If there is more than one in the response queue, tell this button that 
-                // it needs to wait before it can respond.
-                if(_responseQueue.GetResponseCount() > 1 || _currentRespondant.length() > 0)
-                {
-                    SendQueueCommand(mac, _responseQueue.GetResponseCount());
-                }
+                
+                // if(_clientResponses.GetResponseCount() > 1 || _clientResponses.GetCurrentRespondant().length() > 0)
+                // {
+                //     SendQueueCommand(mac, _responseQueue.GetResponseCount());
+                // }
 
                 // Note: A respondant will be selected in the next update, so all we need to here is enqueue
             }
@@ -500,9 +567,64 @@ void BuzzoController::SendSleepCommand(const uint8_t *mac)
 #pragma region Update Functions
 void BuzzoController::UpdatePlaying()
 {
-    if(_currentRespondant.length() > 0)
+    if(_clientResponses.HasCurrentRespondant())
     {
-        if(_isAcceptingResponses) // If this is false, we have already received the correct answer
+        // If we are waiting to move to the next respondant, check to see if enough time has passed.
+        if(_nextResponderDelayStartTime > 0 && millis() - _nextResponderDelayStartTime > TIME_BETWEEN_RESPONDERS)
+        {
+            _nextResponderDelayStartTime = 0;
+
+            // Find our next respondant
+            auto respondantId = _clientResponses.GetCurrentRespondant();
+            auto client = GetClient(respondantId);
+
+            Serial.print("Next respondant: ");
+            Serial.println(respondantId.c_str());
+
+            Serial.print("Is respondant active? ");
+            Serial.println(client->IsActive() ? "YES" : "NO");
+
+            if(client != 0 && client->IsActive())
+            {
+                Serial.println("Answering");
+                _responseStartTime = millis();
+                _responsePauseTime = 0;
+
+                uint8_t mac[6];
+                client->GetMacAddress(mac);
+
+                SendAnswerCommand(mac, RESPONSE_TIME_LIMIT, RESPONSE_TIME_LIMIT);
+                _lastRespondantPingTime = millis();
+            }
+
+            // Tell all other buttons that they're in the queue
+            Serial.println("Telling other buttons they're in the queue");
+            Serial.print("Pending Respondants: ");
+            Serial.println(_clientResponses.GetPendingRespondantCount());
+
+            int placeInQueue = 0;
+            for(int i = 0; i < _clientResponses.GetPendingRespondantCount(); i++)
+            {
+                client = GetClient(_clientResponses.GetNextRespondant(i));
+                if(client != 0 && client->IsActive())
+                {
+                    placeInQueue++;
+
+                    uint8_t mac[6];
+                    client->GetMacAddress(mac);
+
+                    SendQueueCommand(mac, placeInQueue);
+                }
+            }
+
+            Serial.println("Done");
+        }
+        else if(_nextResponderDelayStartTime > 0)
+        {
+            // We're not ready to move to the next response yet
+            return;
+        }
+        else
         {
             if(_isPaused)
             {
@@ -510,15 +632,34 @@ void BuzzoController::UpdatePlaying()
             }
 
             unsigned long millisResponding = millis() - _responseStartTime - _responsePauseTime;
-            int secondsResponding = floor(millisResponding / 1000);            
-
-            // Update respondant timer
-            if(millis() - _lastRespondantPingTime > RESPONDANT_PING_TIME)
+            int secondsResponding = floor(millisResponding / 1000);      
+            
+            // Responder ran out of time
+            if(millisResponding > (RESPONSE_TIME_LIMIT * 1000))
             {
-                Serial.print("Time responding: ");
-                Serial.println(millisResponding);
+                auto client = GetClient(_clientResponses.GetCurrentRespondant());
 
-                auto client = GetClient(_currentRespondant);
+                if(client != 0)
+                {
+                    uint8_t mac[6];
+                    client->GetMacAddress(mac);
+
+                    SendResponseCommand(mac, false);
+                }
+
+                _clientResponses.MoveToNextRespondant();
+                //_previousRespondant.assign(_clientResponses.GetCurrentRespondant());
+                //_clientResponses.GetCurrentRespondant().assign("");
+
+                _responsePauseTime = 0;
+                _nextResponderDelayStartTime = millis();        
+            }            
+            else if(millis() - _lastRespondantPingTime > RESPONDANT_PING_TIME)
+            {
+                // Serial.print("Time responding: ");
+                // Serial.println(millisResponding);
+
+                auto client = GetClient(_clientResponses.GetCurrentRespondant());
 
                 if(client != 0)
                 {                    
@@ -537,84 +678,70 @@ void BuzzoController::UpdatePlaying()
 
                 _lastRespondantPingTime = millis();
             }
-
-            // Responder ran out of time
-            if(millisResponding > (RESPONSE_TIME_LIMIT * 1000))
-            {
-                auto client = GetClient(_currentRespondant);
-
-                if(client != 0)
-                {
-                    uint8_t mac[6];
-                    client->GetMacAddress(mac);
-
-                    SendResponseCommand(mac, false);
-                }
-
-                _previousRespondant.assign(_currentRespondant);
-                _currentRespondant.assign("");
-
-                _responsePauseTime = 0;
-                _nextResponderDelayStartTime = millis();
-            }
         }
     }
-    else if(_currentRespondant.length() == 0)
+    else // No current respondant
     {
-        if(!_responseQueue.IsEmpty() && _isAcceptingResponses == true)
-        {
-            // Wait a short delay between respondants to increase gameplay tension
-            if(millis() - _nextResponderDelayStartTime > TIME_BETWEEN_RESPONDERS)
-            {
-                // Find our next respondant
-                auto nextRespondantId = _responseQueue.DequeueNextResponse();
-                auto client = GetClient(nextRespondantId);
+        // if(_clientResponses.HasNextRespondant() && _clientResponses.IsRoundOver() == false)
+        // {
+        //     // Wait a short delay between respondants to increase gameplay tension
+        //     if(millis() - _nextResponderDelayStartTime > TIME_BETWEEN_RESPONDERS)
+        //     {
+        //         // Find our next respondant
+        //         auto nextRespondantId = _responseQueue.DequeueNextResponse();
+        //         auto client = GetClient(nextRespondantId);
 
-                Serial.print("Next respondant: ");
-                Serial.println(nextRespondantId.c_str());
+        //         Serial.print("Next respondant: ");
+        //         Serial.println(nextRespondantId.c_str());
 
-                Serial.print("Is respondant active? ");
-                Serial.println(client->IsActive() ? "YES" : "NO");
+        //         Serial.print("Is respondant active? ");
+        //         Serial.println(client->IsActive() ? "YES" : "NO");
 
-                if(client != 0 && client->IsActive())
-                {
-                    Serial.println("Answering");
-                    _currentRespondant.assign(client->GetId());
-                    _responseStartTime = millis();
-                    _responsePauseTime = 0;
+        //         if(client != 0 && client->IsActive())
+        //         {
+        //             Serial.println("Answering");
+        //             _clientResponses.GetCurrentRespondant().assign(client->GetId());
+        //             _responseStartTime = millis();
+        //             _responsePauseTime = 0;
 
-                    uint8_t mac[6];
-                    client->GetMacAddress(mac);
+        //             uint8_t mac[6];
+        //             client->GetMacAddress(mac);
 
-                    SendAnswerCommand(mac, RESPONSE_TIME_LIMIT, RESPONSE_TIME_LIMIT);
-                    _lastRespondantPingTime = millis();
-                }
+        //             SendAnswerCommand(mac, RESPONSE_TIME_LIMIT, RESPONSE_TIME_LIMIT);
+        //             _lastRespondantPingTime = millis();
+        //         }
 
-                // Tell all other buttons that they're in the queue
-                int placeInQueue = 0;
-                for(int i = 0; i < _responseQueue.GetResponseCount(); i++)
-                {
-                    client = GetClient(_responseQueue.PeekNextResponse(i));
-                    if(client != 0 && client->IsActive())
-                    {
-                        placeInQueue++;
+        //         // Tell all other buttons that they're in the queue
+        //         int placeInQueue = 0;
+        //         for(int i = 0; i < _responseQueue.GetResponseCount(); i++)
+        //         {
+        //             client = GetClient(_responseQueue.PeekNextResponse(i));
+        //             if(client != 0 && client->IsActive())
+        //             {
+        //                 placeInQueue++;
 
-                        uint8_t mac[6];
-                        client->GetMacAddress(mac);
+        //                 uint8_t mac[6];
+        //                 client->GetMacAddress(mac);
 
-                        SendQueueCommand(mac, placeInQueue);
-                    }
-                }
-            }
-        }
-        else if(_isAcceptingResponses == false)
-        {
-            if(_autoResestTime > 0 && millis() > _autoResestTime)
-            {
-                ResetButtonPress();
-            }
-        }
-    } 
+        //                 SendQueueCommand(mac, placeInQueue);
+        //             }
+        //         }
+        //     }
+        // }
+        // else if(_isAcceptingResponses == false)
+        // {
+        //     if(_autoResestTime > 0 && millis() > _autoResestTime)
+        //     {
+        //         ResetButtonPress();
+        //     }
+        // }
+    }
+    
+    // Do auto reset
+    if(_autoResestTime > 0 && millis() > _autoResestTime)
+    {
+        ResetButtonPress();
+    }
 }
 
 void BuzzoController::UpdateSetup()
@@ -696,14 +823,13 @@ int BuzzoController::GetActiveClientsYetToPlayCount()
         {
             bool hasParticipated = false;
 
-            auto respondantStatus = _clientResponses.GetRespondantStatus();
+            auto respondantStatus = _clientResponses.GetRespondantStatus(_clients[i]->GetId());
 
             if(respondantStatus == RespondantStatus::NONE)
             {
-                continue;
+                count++;
             }
 
-            count++;
             
             // for(int j = 0; j < _participantCount; j++)
             // {
@@ -746,7 +872,7 @@ void BuzzoController::AddAllRemainingClientsToQueue()
 
         if(_clients[i]->IsActive())
         {
-            auto respondantStatus = _clientResponses.GetRespondantStatus();
+            auto respondantStatus = _clientResponses.GetRespondantStatus(_clients[i]->GetId());
 
             if(respondantStatus != RespondantStatus::NONE)
             {
@@ -762,17 +888,14 @@ void BuzzoController::AddAllRemainingClientsToQueue()
             //     }
             // }            
 
-            if(!hasParticipated)
-            {
-                Serial.print("Adding client to response queue: ");
-                Serial.println(_clients[i]->GetId().c_str());
-                
-                // Pretend that this participant has buzzed
-                uint8_t mac[6];
-                _clients[i]->GetMacAddress(mac);
+            Serial.print("Adding client to response queue: ");
+            Serial.println(_clients[i]->GetId().c_str());
+            
+            // Pretend that this participant has buzzed
+            uint8_t mac[6];
+            _clients[i]->GetMacAddress(mac);
 
-                ProcessBuzzCommand(mac);
-            }
+            ProcessBuzzCommand(mac);
         }
     }
 }
@@ -785,70 +908,75 @@ void BuzzoController::EndCurrentRespondantTurn(bool isCorrect)
 {
     _lastButtonPressTime = millis();
 
-    if(_currentState == BuzzoController::PLAYING && _isAcceptingResponses == true)
+    if(_currentState == BuzzoController::PLAYING && _clientResponses.IsRoundOver() == false)
     {
         Serial.print("Ending Turn - ");
         Serial.println(isCorrect ? "CORRECT" : "INCORRECT");
 
-        if(_currentRespondant.length() > 0)
+        if(!_clientResponses.HasCurrentRespondant())
         {
-            auto client = GetClient(_currentRespondant);
+            Serial.println("There is no current respondant");
+            return;
+        }
 
-            if(client != 0)
-            {        
-                if(isCorrect)
-                {
-                    client->SetScore(min(MAX_SCORE, client->GetScore() + 1));
-                    _isAcceptingResponses = false; // The round is over
-                }
+        auto client = GetClient(_clientResponses.GetCurrentRespondant());
 
-                Serial.print("Score: ");
-                Serial.println(client->GetScore());
-
-                u_int8_t mac[6];
-                client->GetMacAddress(mac);
-
-                SendScoreCommand(mac, client->GetScore());
-                SendResponseCommand(mac, isCorrect);
-            }
-
+        if(client != 0)
+        {        
             if(isCorrect)
             {
-                _isAcceptingResponses = false;
-                _autoResestTime = millis() + AUTO_RESET_TIME;
+                client->SetScore(min(MAX_SCORE, client->GetScore() + 1));
+            }
             
-                // for(int i = 0; i < _responseQueue.GetResponseCount(); i++)
-                // {
-                //     auto queuedClient = GetClient(_responseQueue.PeekNextResponse(i));
-                //     if(queuedClient != 0 && queuedClient->IsActive())
-                //     {
-                //         SendResetCommand(queuedClient->GetIpAddress(), false);              
-                //     }
-                // }  
-            }
-            else
-            {
-                _nextResponderDelayStartTime = millis();
+            _clientResponses.MoveToNextRespondant();
 
-                if(_responseQueue.GetResponseCount() == 0)
-                {
-                    Serial.println("Response queue is empty");
+            Serial.print("Score: ");
+            Serial.println(client->GetScore());
 
-                    Serial.print("Clients yet to play: ");
-                    Serial.println(GetActiveClientsYetToPlayCount());
-                    
-                    if(GetActiveClientsYetToPlayCount() == 1)
-                    {
-                        AddAllRemainingClientsToQueue();
-                    }
-                }
-            }
+            u_int8_t mac[6];
+            client->GetMacAddress(mac);
 
-            _previousRespondant.assign(_currentRespondant);
-            _previousRespondantWasCorrect = isCorrect;
-
-            _currentRespondant.assign("");            
+            SendScoreCommand(mac, client->GetScore());
+            SendResponseCommand(mac, isCorrect);
         }
+
+        if(isCorrect)
+        {
+            _clientResponses.EndRound();
+
+            _autoResestTime = millis() + AUTO_RESET_TIME;
+        
+            // for(int i = 0; i < _responseQueue.GetResponseCount(); i++)
+            // {
+            //     auto queuedClient = GetClient(_responseQueue.PeekNextResponse(i));
+            //     if(queuedClient != 0 && queuedClient->IsActive())
+            //     {
+            //         SendResetCommand(queuedClient->GetIpAddress(), false);              
+            //     }
+            // }  
+        }
+        else
+        {
+            _nextResponderDelayStartTime = millis();
+
+            if(_clientResponses.HasCurrentRespondant() == false)
+            {
+                Serial.println("Response queue is empty");
+
+                Serial.print("Clients yet to play: ");
+                Serial.println(GetActiveClientsYetToPlayCount());
+                
+                // if(GetActiveClientsYetToPlayCount() == 1)
+                // {
+                //     AddAllRemainingClientsToQueue();
+                // }
+            }
+        }
+
+        // _previousRespondant.assign(_clientResponses.GetCurrentRespondant());
+        // _previousRespondantWasCorrect = isCorrect;
+        // _clientResponses.GetCurrentRespondant().assign("");            
+        
     }
 }
 
@@ -866,17 +994,22 @@ void BuzzoController::ResetButtonPress()
             SendResetCommand(mac, true);
         }
 
-        _currentRespondant.assign("");
-        _previousRespondant.assign("");
+        // _clientResponses.GetCurrentRespondant().assign("");
+        // _previousRespondant.assign("");
 
-        _isAcceptingResponses = true;
+        //_isAcceptingResponses = true;
         _nextResponderDelayStartTime = 0;
 
-        _responseQueue.Clear();
+        //_responseQueue.Clear();
+        _clientResponses.Reset();
 
-        _participantCount = 0;
+        Serial.print("Has current respondant? ");
+        Serial.println(_clientResponses.HasCurrentRespondant() ? "YES" : "NO");
+
+        //_participantCount = 0;
         
         _autoResestTime = 0;
+        _nextResponderDelayStartTime = 0;
     }    
 }
 
@@ -911,14 +1044,15 @@ void BuzzoController::HoldResetButton()
                 SendScoreCommand(mac, _clients[i]->GetScore());
             }
 
-            _currentRespondant.assign("");
-            _previousRespondant.assign("");
+            _clientResponses.Reset();
+            // _clientResponses.GetCurrentRespondant().assign("");
+            // _previousRespondant.assign("");
 
-            _isAcceptingResponses = true;
+            // _isAcceptingResponses = true;
             _nextResponderDelayStartTime = 0;
             _isReset = true;
 
-            _responseQueue.Clear();
+            // _responseQueue.Clear();
         }
     }    
 }
@@ -939,77 +1073,231 @@ void BuzzoController::ReleaseHoldResetButton()
 
 void BuzzoController::AdjustPreviousRespondant(bool isCorrect)
 {
-    if(_previousRespondant.length() > 0 && _previousRespondantWasCorrect != isCorrect)
+    if(isCorrect)
     {
-        auto client = GetClient(_previousRespondant);
+        // Previous respondant was marked incorrect, but they should have been correct.
+
+        // Check to see if all the conditions are correct
+        // ==============================================
+
+        if(_clientResponses.IsRoundOver()) // If the round is over, then the previous respondant must be correct already
+        {
+            Serial.println("Unable to adjust previous respondant to CORRECT because the round is already over");
+            return;
+        }
+
+        if(!_clientResponses.HasPreviousRespondant()) // If there's no previous respondant then there's nothing to do
+        {
+            Serial.println("Unable to adjust previous respondant to CORRECT because there is no previous respondant");
+            return;
+        }        
+
+        auto client = GetClient(_clientResponses.GetPreviousRespondant());
+        if(client == 0) // If we can't find the client then something's gone wrong
+        {
+            Serial.println("Unable to adjust previous respondant to CORRECT because the client could not be found");
+            return;
+        }
 
         u_int8_t mac[6];
         client->GetMacAddress(mac);
 
-        if(client != 0)
-        {        
-            if(isCorrect)
-            {                
-                client->SetScore(min(MAX_SCORE, client->GetScore() + 1));
+        // Adjust the scores
+        // =================
 
-                Serial.print("New Score: ");
-                Serial.println(client->GetScore());
+        // 1. Give a point to the previous respondant
+        client->SetScore(min(MAX_SCORE, client->GetScore() + 1));
+        Serial.print("New Score: ");
+        Serial.println(client->GetScore());        
 
-                SendScoreCommand(mac, client->GetScore());
-                SendResponseCommand(mac, isCorrect);
+        SendScoreCommand(mac, client->GetScore());
 
-                if(_currentRespondant.length() > 0)
-                {
-                    // Push the current respondant to the start of the queue again, just in case
-                    _responseQueue.PushResponse(_currentRespondant);
-                    _currentRespondant.assign("");
+        // 2. Tell the previous respondant that they were correct
+        SendResponseCommand(mac, isCorrect);
 
-                    int placeInQueue = 0;
-                    for(int i = 0; i < _responseQueue.GetResponseCount(); i++)
-                    {
-                        auto currentRespondantClient = GetClient(_responseQueue.PeekNextResponse(i));
-                        u_int8_t currentRespondantMac[6];
-                        currentRespondantClient->GetMacAddress(currentRespondantMac);
+        // 3. End the round (because a correct answer was given)
+        _clientResponses.EndRound();
 
-                        if(currentRespondantClient != 0 && currentRespondantClient->IsActive())
-                        {
-                            placeInQueue++;
-                            SendQueueCommand(currentRespondantMac, placeInQueue);
-                        }
-                    }  
-                }    
-            }
-            else
+        // 4. Tell all other buttons that they're in the queue again
+        int placeInQueue = 0;
+        for(int i = 0; i < _clientResponses.GetPendingRespondantCount(); i++)
+        {
+            auto pendingClient = GetClient(_clientResponses.GetNextRespondant(i));
+            u_int8_t pendingMac[6];
+            pendingClient->GetMacAddress(pendingMac);
+
+            if(pendingClient != 0 && pendingClient->IsActive())
             {
-                // 1. If they were previously given a score, subtract it
-                client->SetScore(max(0, client->GetScore() - 1));
-                Serial.print("New Score: ");
-                Serial.println(client->GetScore());
-
-                // 2. Tell the previous respondant that they were incorrect
-                SendScoreCommand(mac, client->GetScore());
-                SendResponseCommand(mac, isCorrect);
-
-                // 3. Tell all other buttons that they're in the queue again
-                int placeInQueue = 0;
-                for(int i = 0; i < _responseQueue.GetResponseCount(); i++)
-                {
-                    client = GetClient(_responseQueue.PeekNextResponse(i));
-                    if(client != 0 && client->IsActive())
-                    {
-                        placeInQueue++;
-                        SendQueueCommand(mac, placeInQueue);
-                    }
-                }  
-
-                // 4. Add a bit of a delay befor the next turn. Just to give the moment time to breath
-                _nextResponderDelayStartTime = millis() + 2000; // Add a bit more time here
+                placeInQueue++;
+                SendQueueCommand(pendingMac, placeInQueue);
             }
-
-            _previousRespondantWasCorrect = isCorrect;
-            _isAcceptingResponses = !isCorrect;
         }
+
+        // 5. Make sure auto reset is disabled
+        _autoResestTime = 0;
+        // ...And we're done
+    
     }
+    else
+    {
+        // Previous respondant was marked correct, but they should have been incorrect.
+
+        // Check to see if all the conditions are correct
+        // ==============================================
+
+        if(!_clientResponses.IsRoundOver()) // If the round is not over, then the previous respondant must be incorrect already
+        {
+            Serial.println("Unable to adjust previous respondant to INCORRECT because the round is already over");
+            return;
+        }
+
+        if(!_clientResponses.HasPreviousRespondant()) // If there's no previous respondant then there's nothing to do
+        {
+            Serial.println("Unable to adjust previous respondant to INCORRECT because there is no previous respondant");
+            return;
+        }
+
+        auto client = GetClient(_clientResponses.GetPreviousRespondant());
+
+        if(client == 0) // If we can't find the client then something's gone wrong
+        {
+            Serial.println("Unable to adjust previous respondant to INCORRECT because the client could not be found");
+            return;
+        }        
+
+        u_int8_t mac[6];
+        client->GetMacAddress(mac);
+        
+        // Adjust the score
+        // =================
+
+        // 1. If they were previously given a score, subtract it
+        client->SetScore(max(0, client->GetScore() - 1));
+        Serial.print("New Score: ");
+        Serial.println(client->GetScore());        
+
+        SendScoreCommand(mac, client->GetScore());
+
+        // 2. Tell the previous respondant that they were incorrect
+        SendResponseCommand(mac, isCorrect);
+
+        // 3. Resume the game
+        _clientResponses.StartRound();
+        
+        // 4. Set the next responder delay to give the moment time to breath
+        _nextResponderDelayStartTime = millis();
+
+        // 5. Make sure auto reset is disabled
+        _autoResestTime = 0;
+
+    }
+
+    // //if(_previousRespondant.length() > 0 && _previousRespondantWasCorrect != isCorrect)
+    // if(_clientResponses.HasPreviousRespondant())
+    // {
+    //     auto client = GetClient(_clientResponses.GetPreviousRespondant());
+
+    //     if(client == 0)
+    //     {
+    //         return;
+    //     }
+
+    //     u_int8_t mac[6];
+    //     client->GetMacAddress(mac);
+
+    //     auto previousRespondantStatus = _clientResponses.GetRespondantStatus(client->GetId());
+
+    //     if(!(previousRespondantStatus == CORRECT || previousRespondantStatus == INCORRECT))
+    //     {
+    //         // Previous respondant has an unexpected status. No way to handle this.
+
+    //         Serial.print("Previous respondant has an unexpected status: ");
+    //         Serial.println(previousRespondantStatus);
+    //         return;
+    //     }
+        
+
+    //     if(previousRespondantStatus == RespondantStatus::INCORRECT)
+    //     {
+    //         if(desiredStatus == RespondantStatus::INCORRECT)
+    //         {
+    //             return; // Nothing to do, prevous respondant is already incorrect
+    //         }
+    //         else
+    //         {
+    //             // The previous respondant was incorrect, but we're now saying they were correct. Let's fix:
+    //             _clientResponses.EndRound();
+
+                
+    //         }
+    //     } 
+
+
+
+    //     if(client != 0)
+    //     {        
+    //         if(isCorrect)
+    //         {                
+    //             client->SetScore(min(MAX_SCORE, client->GetScore() + 1));
+
+    //             Serial.print("New Score: ");
+    //             Serial.println(client->GetScore());
+
+    //             SendScoreCommand(mac, client->GetScore());
+    //             SendResponseCommand(mac, isCorrect);
+
+    //             if(_clientResponses.GetCurrentRespondant().length() > 0)
+    //             {
+    //                 // Push the current respondant to the start of the queue again, just in case
+    //                 _responseQueue.PushResponse(_clientResponses.GetCurrentRespondant());
+    //                 _clientResponses.GetCurrentRespondant().assign("");
+
+    //                 int placeInQueue = 0;
+    //                 for(int i = 0; i < _responseQueue.GetResponseCount(); i++)
+    //                 {
+    //                     auto currentRespondantClient = GetClient(_responseQueue.PeekNextResponse(i));
+    //                     u_int8_t currentRespondantMac[6];
+    //                     currentRespondantClient->GetMacAddress(currentRespondantMac);
+
+    //                     if(currentRespondantClient != 0 && currentRespondantClient->IsActive())
+    //                     {
+    //                         placeInQueue++;
+    //                         SendQueueCommand(currentRespondantMac, placeInQueue);
+    //                     }
+    //                 }  
+    //             }    
+    //         }
+    //         else
+    //         {
+    //             // 1. If they were previously given a score, subtract it
+    //             client->SetScore(max(0, client->GetScore() - 1));
+    //             Serial.print("New Score: ");
+    //             Serial.println(client->GetScore());
+
+    //             // 2. Tell the previous respondant that they were incorrect
+    //             SendScoreCommand(mac, client->GetScore());
+    //             SendResponseCommand(mac, isCorrect);
+
+    //             // 3. Tell all other buttons that they're in the queue again
+    //             int placeInQueue = 0;
+    //             for(int i = 0; i < _responseQueue.GetResponseCount(); i++)
+    //             {
+    //                 client = GetClient(_responseQueue.PeekNextResponse(i));
+    //                 if(client != 0 && client->IsActive())
+    //                 {
+    //                     placeInQueue++;
+    //                     SendQueueCommand(mac, placeInQueue);
+    //                 }
+    //             }  
+
+    //             // 4. Add a bit of a delay befor the next turn. Just to give the moment time to breath
+    //             _nextResponderDelayStartTime = millis() + 2000; // Add a bit more time here
+    //         }
+
+    //         _previousRespondantWasCorrect = isCorrect;
+    //         _isAcceptingResponses = !isCorrect;
+    //     }
+    // }
     // else
     // {
     //     _isInAdjustMode = true;

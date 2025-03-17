@@ -1,8 +1,10 @@
 #include "ClientResponseQueue.h"
+#include <bits/stdc++.h>
+using namespace std;
 
 ClientResponseQueue::ClientResponseQueue() :
 _currentIndex(0),
-_responseCount(0),
+_respondantCount(0),
 _isRoundOver(false)
 {
     for(int i = 0; i < MAX_QUEUE_LENGTH; i++)
@@ -24,30 +26,64 @@ void ClientResponseQueue::Reset()
     _respondantCount = 0;
 }
 
-void ClientResponseQueue::EnqueueRespondant(std::string respondantId)
+bool ClientResponseQueue::EnqueueRespondant(std::string respondantId)
 {
+
+    bool isCurrentRespondant = HasCurrentRespondant() == false && IsRoundOver() == false;
+    
+
     if(_respondantCount >= MAX_QUEUE_LENGTH)
     {
-        return;
+        return false;
     }
 
-    _queue[_currentIndex].assign(respondantId);
+    _queue[_respondantCount].assign(respondantId);
     _respondantCount++;
+
+    // Return true if the client we just enqueued is the current respondant
+    return isCurrentRespondant;
 }
 
-void ClientResponseQueue::GetRespondantCount()
+int ClientResponseQueue::GetRespondantCount()
 {
     return _respondantCount;
 }
 
+int ClientResponseQueue::GetPendingRespondantCount()
+{
+    if(_isRoundOver)
+    {
+        return max((unsigned int)0, (_respondantCount) - _currentIndex);
+    }
+    else
+    {
+        return max((unsigned int)0, (_respondantCount - 1) - _currentIndex);
+    }
+}
+
 bool ClientResponseQueue::HasNextRespondant()
 {
-    return _currentIndex < _respondantCount - 1;
+    if(_isRoundOver)
+    {
+        // If the round is over, the respondant at the current index counts as the next respondant.        
+        return _currentIndex < _respondantCount;
+    }
+    else
+    {
+        return _currentIndex < _respondantCount - 1;
+    }
 }
 
 bool ClientResponseQueue::HasCurrentRespondant()
 {
-    return _currentIndex < _respondantCount;
+    if(_isRoundOver)
+    {
+        return false;
+    }
+    else
+    {
+        return _currentIndex < _respondantCount;
+    }
 }
 
 bool ClientResponseQueue::HasPreviousRespondant()
@@ -62,18 +98,17 @@ void ClientResponseQueue::MoveToNextRespondant()
         return;
     }    
 
-    _currentIndex = min(MAX_QUEUE_LENGTH - 1, _currentIndex + 1);
+    _currentIndex = min(MAX_QUEUE_LENGTH - 1, (int)_currentIndex + 1);
 }
 
 void ClientResponseQueue::EndRound()
 {
-    if(_isRoundOver)
-    {
-        return;
-    }
-
-    MoveToNextRespondant();
     _isRoundOver = true;
+}
+
+void ClientResponseQueue::StartRound()
+{
+    _isRoundOver = false;
 }
 
 std::string ClientResponseQueue::GetPreviousRespondant()
@@ -103,10 +138,23 @@ std::string ClientResponseQueue::GetNextRespondant()
         return 0;
     }
 
-    return _queue[_currentIndex + 1];
+    return GetNextRespondant(0);
 }
 
-RespondantStatus clientresponsequeue::GetRespondantStatus(std::string respondantId)
+std::string ClientResponseQueue::GetNextRespondant(unsigned int index)
+{
+    int offset = _isRoundOver ? 0 : 1;
+    index += _currentIndex + offset;
+    
+    if(index >= _respondantCount)
+    {
+        return 0;
+    }
+
+    return _queue[index];
+}
+
+RespondantStatus ClientResponseQueue::GetRespondantStatus(std::string respondantId)
 {
     RespondantStatus result = RespondantStatus::NONE;
 
@@ -114,29 +162,45 @@ RespondantStatus clientresponsequeue::GetRespondantStatus(std::string respondant
     {
         if(_queue[i].compare(respondantId) == 0)
         {
-            if(i < _currentIndex - 1)
+            if(_currentIndex > 0 && i < _currentIndex - 1)
             {
                 result = RespondantStatus::INCORRECT;
             }
-            else if(i == _currentIndex - 1)
+            else if(_currentIndex > 0 && i == _currentIndex - 1)
             {
                 result = _isRoundOver ? RespondantStatus::CORRECT : RespondantStatus::INCORRECT;
             }
             else if(i == _currentIndex)
             {
-                result = _isRoundOver ? RespondantStatus::PENDING : RespondantStatus::ANSWERING;
+                result = _isRoundOver ? RespondantStatus::QUEUED : RespondantStatus::ANSWERING;
             }
             else
             {
-                result = RespondantStatus::PENDING;
+                result = RespondantStatus::QUEUED;
             }
+
+            break;
         }
     }
 
     return result;
 }
 
-bool IsRoundOver()
+int ClientResponseQueue::GetQueuedRespondantIndex(std::string respondantId)
+{
+    int startIndex = _isRoundOver ? _currentIndex : _currentIndex + 1;
+    for(int i = startIndex; i < _respondantCount; i++)
+    {
+        if(_queue[i].compare(respondantId) == 0)
+        {
+            return i;
+        }
+    }
+
+    return -1;
+}
+
+bool ClientResponseQueue::IsRoundOver()
 {
     return _isRoundOver;
 }

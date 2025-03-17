@@ -101,7 +101,7 @@ void IdleUpdate(BuzzoButton* button)
     }
     else
     {
-        if(button->_batteryLevel < 5.0f || button->_isBlinking)
+        if(button->_batteryLevel < 7 || button->_isBlinking)
         {
             button->_isBlinking = ((millis()) % 3000) < 300;
 
@@ -110,6 +110,12 @@ void IdleUpdate(BuzzoButton* button)
             for(int i = 0; i < button->_strip.PixelCount(); i++)
             {
                 uint8_t targetBrightness = i < button->_currentScore ? 128 : 8;
+
+                if(button->_isBlinking)
+                {
+                    targetBrightness = i < button->_batteryLevel ? 180 : 9
+                }
+
                 button->_strip.SetPixelColor(i, RgbColor(targetBrightness, button->_isBlinking ? 0 : targetBrightness, button->_isBlinking ? 0 : targetBrightness));
             }
             button->_strip.Show();                
@@ -369,7 +375,7 @@ void QueuedUpdate(BuzzoButton* button)
 
         float hue = mapf(f, 0.0f, 1.0f, colorB, colorA);
         float sat = 1.0f;
-        float val = mapf(f, 0.0f, 1.0f, 0.1f, 0.5f);
+        float val = mapf(f, 0.0f, 1.0f, 0.3f, 0.9f);
 
         button->_strip.SetPixelColor(i, HsbColor(hue,sat,val));
     }
