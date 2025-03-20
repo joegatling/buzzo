@@ -1,5 +1,8 @@
+#if defined(NATIVE_TEST)
+
+#else
 #include <Arduino.h>
-#include <Wifi.h>
+#include <WiFi.h>
 
 #include <Adafruit_NeoPixel.h>
 
@@ -11,7 +14,7 @@ Adafruit_MAX17048 maxlipo;
 
 #if BUZZO_CONTROLLER
 
-  #include "BuzzoController.h"
+  #include <BuzzoController.h>
 
   IPAddress local_IP(192,168,1,1);
   IPAddress gateway(192,168,1,1);
@@ -24,7 +27,7 @@ Adafruit_MAX17048 maxlipo;
 
 #else
 
-  #include "BuzzoButton.h"
+  #include <BuzzoButton.h>
 
   #define DISCONNECTED_SLEEP_TIMER  (2 * 60 * 1000)
   #define CONNECTED_SLEEP_TIMER     (15 * 60 * 1000)
@@ -304,4 +307,5 @@ void loop()
 }
 
 
+#endif
 #endif

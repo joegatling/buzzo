@@ -9,7 +9,7 @@
 
 #include "ButtonClientInfo.h"
 //#include "ResponseQueue.h"
-#include "ClientResponseQueue.h"
+#include <ClientResponseQueue.h>
 
 #define PACKET_MAX_SIZE 256
 #define PACKET_MAX_QUEUE 4

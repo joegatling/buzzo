@@ -1,5 +1,5 @@
 
-#include <Wifi.h>
+#include <WiFi.h>
 #include <esp_now.h>
 #include <Arduino.h>
 #include <iostream>
@@ -10,7 +10,7 @@
 
 
 #include "BuzzoButton.h"
-#include "Commands.h"
+#include "CommandsButton.h"
 
 uint8_t receiverAddress[] = {0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF};
 
@@ -113,7 +113,7 @@ void IdleUpdate(BuzzoButton* button)
 
                 if(button->_isBlinking)
                 {
-                    targetBrightness = i < button->_batteryLevel ? 180 : 8
+                    targetBrightness = i < button->_batteryLevel ? 180 : 8;
                 }
 
                 button->_strip.SetPixelColor(i, RgbColor(targetBrightness, button->_isBlinking ? 0 : targetBrightness, button->_isBlinking ? 0 : targetBrightness));

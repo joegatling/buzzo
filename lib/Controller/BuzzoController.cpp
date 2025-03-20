@@ -8,10 +8,11 @@
 
 
 #include "BuzzoController.h"
-#include "Commands.h"
+#include "CommandsController.h"
 
 #define RESPONSE_TIME_LIMIT     20
 #define TIME_BETWEEN_RESPONDERS (1 * 1000)
+#define TIME_BEFORE_FIRST_RESPONSE (250)
 #define RESPONDANT_PING_TIME    500
 #define AUTO_RESET_TIME         10000
 
@@ -468,7 +469,7 @@ void BuzzoController::ProcessBuzzCommand(const uint8_t *mac)
                     if(thisClientShouldAnswer)
                     {
                         Serial.println("Setting response delay...");
-                        _nextResponderDelayStartTime = millis();
+                        _nextResponderDelayStartTime = millis() - TIME_BETWEEN_RESPONDERS + TIME_BEFORE_FIRST_RESPONSE;
                     }
                     else
                     {
