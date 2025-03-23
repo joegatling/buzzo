@@ -41,7 +41,6 @@ void ToneGenerator::DoSound(SoundId soundId, bool clearQueue)
     }
     else if(soundId == ToneGenerator::INCORRECT)
     {
-        
         EnqueueNote(NOTE_G4, 20);
         EnqueueNote(NOTE_E4, 20);
         EnqueueNote(NOTE_AS4, 20);
