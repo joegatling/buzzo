@@ -216,18 +216,22 @@ void loop()
 
   if(BuzzoController::GetInstance()->IsGoingToSleep())
   {
+    //Serial.println("Going to sleep");
     analogWrite(LOW_POWER_PIN, 0);
   }
   else if(GetBatteryLevel() < 10)
   {
+    //Serial.println("Low battery");
     analogWrite(LOW_POWER_PIN, (millis() % 1000) < 500 ? 256 : 0);
   }
   else if(BuzzoController::GetInstance()->GetMinBatteryLevelForClients() < 10)
   {
+    //Serial.println("Low client battery");
     analogWrite(LOW_POWER_PIN, (millis() % 2000) < 200 ? 10 : 0);
   }
   else
   {
+    //Serial.println("Normal");
     analogWrite(LOW_POWER_PIN, 2);
   }
 
@@ -242,6 +246,8 @@ void loop()
     lastClientReportTime = millis();
     Serial.print("Clients: ");
     Serial.println(BuzzoController::GetInstance()->GetActiveClientCount());
+    Serial.print("Min Client Battery: ");
+    Serial.println(BuzzoController::GetInstance()->GetMinBatteryLevelForClients());
   }
 
 }
