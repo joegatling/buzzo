@@ -609,7 +609,7 @@ void OnDataSent(const uint8_t *mac_addr, esp_now_send_status_t status)
     // Serial.println(status == ESP_NOW_SEND_SUCCESS ? "Delivery Success" : "Delivery Fail");
 }
 
-void OnDataReceived(const uint8_t *mac, const uint8_t *data, int len) 
+void OnDataReceived(const esp_now_recv_info_t *info, const uint8_t *data, int len) 
 {
     len = min(len, PACKET_MAX_SIZE);
 
@@ -617,12 +617,12 @@ void OnDataReceived(const uint8_t *mac, const uint8_t *data, int len)
     memcpy(packetBuffer, data, len);
     packetBuffer[len] = 0;
 
-    if (memcmp(mac, "\xFF\xFF\xFF\xFF\xFF\xFF", 6) == 0) 
+    if (memcmp(info->des_addr, "\xFF\xFF\xFF\xFF\xFF\xFF", 6) == 0) 
     {
         return;
     }
 
-    BuzzoButton::GetInstance()->EnqueuePacketData(mac, packetBuffer);
+    BuzzoButton::GetInstance()->EnqueuePacketData(info->src_addr, packetBuffer);
 
     // Serial.print("Last Packet Recv Data: ");
     // for(int i = 0; i < len; i++)

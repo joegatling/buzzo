@@ -34,7 +34,7 @@ void OnControllerDataSent(const uint8_t *mac_addr, esp_now_send_status_t status)
     // Serial.println(status == ESP_NOW_SEND_SUCCESS ? "Delivery Success" : "Delivery Fail");
 }
 
-void OnControllerDataReceived(const uint8_t *mac, const uint8_t *data, int len) 
+void OnControllerDataReceived(const esp_now_recv_info_t *info, const uint8_t *data, int len) 
 {
     len = min(len, PACKET_MAX_SIZE);
 
@@ -42,7 +42,7 @@ void OnControllerDataReceived(const uint8_t *mac, const uint8_t *data, int len)
     memcpy(packetBuffer, data, len);
     packetBuffer[len] = 0;
 
-    BuzzoController::GetInstance()->EnqueuePacketData(mac, packetBuffer);
+    BuzzoController::GetInstance()->EnqueuePacketData(info->src_addr, packetBuffer);
 
     // Serial.print("Last Packet Recv Data: ");
     // for(int i = 0; i < len; i++)
@@ -786,6 +786,11 @@ ButtonClientInfo* BuzzoController::GetClient(const uint8_t *mac)
 
 ButtonClientInfo* BuzzoController::GetClient(std::string id)
 {
+    if(id.empty())
+    {
+        return 0;
+    }
+
     for(int i = 0; i < _clientCount; i++)
     {
         if(_clients[i]->GetId().compare(id) == 0)

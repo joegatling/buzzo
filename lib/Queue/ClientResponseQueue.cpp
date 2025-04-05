@@ -115,7 +115,7 @@ std::string ClientResponseQueue::GetPreviousRespondant()
 {
     if(!HasPreviousRespondant())
     {
-        return 0;
+        return "";
     }
 
     return _queue[_currentIndex - 1];
@@ -125,7 +125,7 @@ std::string ClientResponseQueue::GetCurrentRespondant()
 {
     if(!HasCurrentRespondant())
     {
-        return 0;
+        return "";
     }
 
     return _queue[_currentIndex];
@@ -135,7 +135,7 @@ std::string ClientResponseQueue::GetNextRespondant()
 {
     if(!HasNextRespondant())
     {
-        return 0;
+        return "";
     }
 
     return GetNextRespondant(0);
@@ -148,7 +148,7 @@ std::string ClientResponseQueue::GetNextRespondant(unsigned int index)
     
     if(index >= _respondantCount)
     {
-        return 0;
+        return "";
     }
 
     return _queue[index];
