@@ -8,7 +8,6 @@
 #include <sstream>
 #include <iterator>
 
-
 #include "BuzzoButton.h"
 #include "CommandsButton.h"
 
@@ -609,7 +608,7 @@ void OnDataSent(const uint8_t *mac_addr, esp_now_send_status_t status)
     // Serial.println(status == ESP_NOW_SEND_SUCCESS ? "Delivery Success" : "Delivery Fail");
 }
 
-void OnDataReceived(const esp_now_recv_info_t *info, const uint8_t *data, int len) 
+void OnDataReceived(const uint8_t *mac, const uint8_t *data, int len) 
 {
     len = min(len, PACKET_MAX_SIZE);
 
@@ -617,12 +616,12 @@ void OnDataReceived(const esp_now_recv_info_t *info, const uint8_t *data, int le
     memcpy(packetBuffer, data, len);
     packetBuffer[len] = 0;
 
-    if (memcmp(info->des_addr, "\xFF\xFF\xFF\xFF\xFF\xFF", 6) == 0) 
-    {
-        return;
-    }
+    // if (memcmp(info->des_addr, "\xFF\xFF\xFF\xFF\xFF\xFF", 6) == 0) 
+    // {
+    //     return;
+    // }
 
-    BuzzoButton::GetInstance()->EnqueuePacketData(info->src_addr, packetBuffer);
+    BuzzoButton::GetInstance()->EnqueuePacketData(mac, packetBuffer);
 
     // Serial.print("Last Packet Recv Data: ");
     // for(int i = 0; i < len; i++)
@@ -649,7 +648,7 @@ _currentScore(0),
 _canBuzz(false),
 _batteryLevel(100),
 _isBlinking(false),
-_button(BUZZER_BUTTON_PIN),
+_button(BUTTON_PIN),
 _strip(6, NEOPIXEL_PIN),
 _lastButtonPressTime(0),
 _currentState(BuzzoButton::NONE),
