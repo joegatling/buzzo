@@ -8,13 +8,15 @@
     #define SPEAKER_PIN 1
 #endif
 
+#define RESOLUTION 10
+
 ToneGenerator::ToneGenerator():
 _isTicking(false),
 _currentNote(0),
 _currentDuration(0),
 _tickingUrgency(1)
 {
-    ledcDetachPin(SPEAKER_PIN);
+    ledcDetach(SPEAKER_PIN);
 }
 
 void ToneGenerator::DoSound(SoundId soundId, bool clearQueue)
@@ -169,7 +171,7 @@ void ToneGenerator::Update()
         {
             _currentNote = 0;
             //noTone(SPEAKER_PIN);
-            ledcDetachPin(SPEAKER_PIN);
+            ledcDetach(SPEAKER_PIN);
         }
     }
 
@@ -182,7 +184,7 @@ void ToneGenerator::Update()
 
         if(_currentNote != NOTE_NONE && _currentNote >= NOTE_MIN && _currentNote <= NOTE_MAX)
         {
-            ledcAttachPin(SPEAKER_PIN, 0);
+            ledcAttach(SPEAKER_PIN, 0, RESOLUTION);
             ledcWriteTone(0, _currentNote);
         }
         
@@ -203,7 +205,7 @@ void ToneGenerator::ClearSoundQueue()
 {
     _soundQueueCount = 0;
     //noTone(SPEAKER_PIN);
-    ledcDetachPin(SPEAKER_PIN);
+    ledcDetach(SPEAKER_PIN);
 }
 
 void ToneGenerator::EnqueueNote(unsigned int note, unsigned int duration)

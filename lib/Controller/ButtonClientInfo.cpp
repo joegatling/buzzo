@@ -4,29 +4,39 @@
 #define MAX_SCORE 9
 
 ButtonClientInfo::ButtonClientInfo() :
-_ip(),
 _score(0),
 _lastContactMillis(millis())
 {
+    memset(_mac, 0, sizeof(_mac));
+
     _id.assign("");
 }
 
-ButtonClientInfo::ButtonClientInfo(IPAddress ip, std::string id) :
-_ip(ip),
+ButtonClientInfo::ButtonClientInfo(const uint8_t *mac, std::string id) :
 _score(0),
 _id(id),
 _lastContactMillis(millis())
 {
+    for(int i = 0; i < 6; i++)
+    {
+        _mac[i] = mac[i];
+    }
 }
 
-IPAddress ButtonClientInfo::GetIpAddress()
+void ButtonClientInfo::GetMacAddress(uint8_t mac[6])
 {
-    return _ip;
+    for(int i = 0; i < 6; i++)
+    {
+        mac[i] = _mac[i];
+    }
 }
 
-void ButtonClientInfo::SetIpAddress(IPAddress newAddress)
+void ButtonClientInfo::SetMacAddress(const uint8_t *newMac)
 {
-    _ip = newAddress;
+    for(int i = 0; i < 6; i++)
+    {
+        _mac[i] = newMac[i];
+    }
 }
 
 std::string& ButtonClientInfo::GetId()
@@ -74,4 +84,17 @@ unsigned int ButtonClientInfo::GetBatteryLevel()
 void ButtonClientInfo::SetBatteryLevel(unsigned int level)
 {
     _batteryLevel = level;
+}
+
+bool ButtonClientInfo::CompareMac(const uint8_t *mac)
+{
+    for(int i = 0; i < 6; i++)
+    {
+        if(_mac[i] != mac[i])
+        {
+            return false;
+        }
+    }
+
+    return true;
 }
