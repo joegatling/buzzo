@@ -4,13 +4,13 @@
 #include <Arduino.h>
 #include <WiFi.h>
 
-#if defined(BUZZO_BUTTON_ADAFRUIT)
+#if defined(BUZZO_BUTTON_ADAFRUIT) || defined(BUZZO_CONTROLLER_ADAFRUIT)
 #include "Adafruit_MAX1704X.h"
 
 Adafruit_MAX17048 maxlipo;
 #endif
 
-#if BUZZO_CONTROLLER
+#if defined(BUZZO_CONTROLLER_ADAFRUIT) || defined(BUZZO_CONTROLLER_ALIEXPRESS)
 
   #include <BuzzoController.h>
 
@@ -21,7 +21,7 @@ Adafruit_MAX17048 maxlipo;
   #define DISCONNECTED_SLEEP_TIMER  (4 * 60 * 1000)
   #define CONNECTED_SLEEP_TIMER     (40 * 60 * 1000)
 
-  #define LOW_POWER_PIN   27
+  #define LOW_POWER_PIN   11
 
 #else
 
@@ -63,7 +63,7 @@ float mapFloat(float x, float in_min, float in_max, float out_min, float out_max
 
 unsigned int GetBatteryLevel()
 {
-  #if defined(BUZZO_BUTTON_ADAFRUIT)
+  #if defined(BUZZO_BUTTON_ADAFRUIT) || defined(BUZZO_CONTROLLER_ADAFRUIT)
     float cellVoltage = maxlipo.cellVoltage();
     if (isnan(cellVoltage)) 
     {
@@ -98,9 +98,6 @@ unsigned int GetBatteryLevel()
 
 void Sleep()
 {
-
-    
-
     #if BUZZO_BUTTON
       BuzzoButton::GetInstance()->SetState(BuzzoButton::GO_TO_SLEEP);
       return;
@@ -112,7 +109,7 @@ void Sleep()
       WiFi.disconnect(true);
       digitalWrite(LED_PIN, LOW);
       delay(100);
-      esp_sleep_enable_ext0_wakeup(GPIO_NUM_14, LOW);
+      esp_sleep_enable_ext0_wakeup(GPIO_NUM_5, LOW);
       esp_deep_sleep_start();
     #endif
 
@@ -136,7 +133,7 @@ void setup()
     setCpuFrequencyMhz(80);
   #endif
 
-  #if defined(BUZZO_BUTTON_ADAFRUIT)
+  #if !defined(BUZZO_BUTTON_ALIEXPRESS)
     while (!maxlipo.begin()) {
       Serial.println(F("Couldnt find Adafruit MAX17048?\nMake sure a battery is plugged in!"));
       delay(2000);
@@ -146,7 +143,6 @@ void setup()
     Serial.println(maxlipo.getChipID(), HEX);  
   #endif
 
-
   #if BUZZO_CONTROLLER
 
     pinMode(LOW_POWER_PIN, ANALOG);
@@ -155,8 +151,9 @@ void setup()
     pinMode(LED_PIN, OUTPUT);
     digitalWrite(LED_PIN, HIGH);
     
-    
     BuzzoController::GetInstance()->Initialize();
+
+    Serial.println("Buzzo Controller Initialized");
     
   #elif BUZZO_BUTTON
 
@@ -222,14 +219,18 @@ void loop()
     Sleep();
   }
 
-  //Serial.println(GetBatteryLevel());
   if(millis() - lastClientReportTime > 5000)
   {
     lastClientReportTime = millis();
+    Serial.print("Controller Battery: ");
+    Serial.println(GetBatteryLevel());
     Serial.print("Clients: ");
     Serial.println(BuzzoController::GetInstance()->GetActiveClientCount());
-    Serial.print("Min Client Battery: ");
-    Serial.println(BuzzoController::GetInstance()->GetMinBatteryLevelForClients());
+    if(BuzzoController::GetInstance()->GetActiveClientCount() > 0)
+    {
+      Serial.print("Min Client Battery: ");
+      Serial.println(BuzzoController::GetInstance()->GetMinBatteryLevelForClients());
+    }
   }
 
 }
