@@ -29,10 +29,10 @@
     // BLUE
     #define RESET_BUTTON_PIN 14
 #else
-    #define PAUSE_BUTTON_PIN 10
-    #define CORRECT_BUTTON_PIN 9
-    #define INCORRECT_BUTTON_PIN 6
-    #define RESET_BUTTON_PIN 5
+    #define PAUSE_BUTTON_PIN GPIO_NUM_10
+    #define CORRECT_BUTTON_PIN GPIO_NUM_9
+    #define INCORRECT_BUTTON_PIN GPIO_NUM_6
+    #define RESET_BUTTON_PIN GPIO_NUM_5
 #endif
 
 struct ControllerReceivedPacketData

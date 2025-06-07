@@ -6,6 +6,8 @@
 #include <string>
 #include <sstream>
 
+#include "driver/rtc_io.h"
+
 
 #include "BuzzoController.h"
 #include "CommandsController.h"
@@ -1043,7 +1045,7 @@ void BuzzoController::HoldResetButton()
         if(_isReset)
         {
             _shouldSleep = true;
-            digitalWrite(13, LOW);
+            //digitalWrite(13, LOW);
 
             for(int i = 0; i < _clientCount; i++)
             {
@@ -1086,9 +1088,14 @@ void BuzzoController::ReleaseHoldResetButton()
     {
         WiFi.disconnect(true);
 
-        // esp_sleep_enable_ext0_wakeup(GPIO_NUM_32, LOW);
-        // esp_sleep_enable_ext0_wakeup(GPIO_NUM_15, LOW);    
-        esp_sleep_enable_ext0_wakeup(GPIO_NUM_14, LOW);
+        delay(200);
+
+        rtc_gpio_init(RESET_BUTTON_PIN);
+        rtc_gpio_set_direction(RESET_BUTTON_PIN, RTC_GPIO_MODE_INPUT_ONLY);
+        rtc_gpio_pullup_en(RESET_BUTTON_PIN);
+        rtc_gpio_pulldown_dis(RESET_BUTTON_PIN);        
+
+        esp_sleep_enable_ext0_wakeup(RESET_BUTTON_PIN, LOW);
 
         esp_deep_sleep_start();  
     } 

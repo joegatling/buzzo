@@ -109,7 +109,7 @@ void Sleep()
       WiFi.disconnect(true);
       digitalWrite(LED_PIN, LOW);
       delay(100);
-      esp_sleep_enable_ext0_wakeup(GPIO_NUM_5, LOW);
+      esp_sleep_enable_ext0_wakeup(GPIO_NUM_10, LOW);
       esp_deep_sleep_start();
     #endif
 
@@ -125,6 +125,9 @@ void Sleep()
 void setup() 
 {
   Serial.begin(115200);
+  
+  delay(200); // Give serial time to connect
+  
   Serial.println();
 
   wakeTime = millis();
