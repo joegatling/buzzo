@@ -1,16 +1,23 @@
 #pragma once
 
-#include <WiFiudp.h>
+//#include <WiFiudp.h>
 //#include <Adafruit_NeoPixel.h>
+#include <esp_wifi.h>
+#include <esp_now.h>
 #include <NeoPixelBusLg.h>
 #include <SimpleButton.h>
 
 #include "BuzzoButtonState.h"
 #include "ToneGenerator.h"
 
-#define PACKET_MAX_SIZE 1024
+#define PACKET_MAX_SIZE 256
+#define PACKET_MAX_QUEUE 4
+
 #define PING_INTERVAL 20000
-#define PORT 8888
+#define DISCONNECTED_PING_INTERVAL 1000
+
+#define CONNECTION_TIMEOUT 
+//#define PORT 8888
 
 #define NUM_LED 6
 
@@ -28,6 +35,12 @@
 #define UNIQUE_ID_LEN 32
 
 class BuzzoButtonState;
+
+struct ReceivedPacketData
+{
+    uint8_t mac[6];
+    char packetBuffer[PACKET_MAX_SIZE + 1];
+};
 
 class BuzzoButton
 {
@@ -68,12 +81,14 @@ class BuzzoButton
         void DisableLightsAndSound();
 
         ToneGenerator* GetToneGenerator() { return &_toneGenerator; }
+        
+        void EnqueuePacketData(const uint8_t *mac, const char* packetBuffer);
+
 
     private:
         static BuzzoButton* _instance;
 
         BuzzoButton();
-        void ProcessPacket();
 
         void ProcessAnswerCommand(int timeLeft, int totalTime);
         void ProcessQueueCommand(int placeInQueue);
@@ -122,11 +137,20 @@ class BuzzoButton
 
         friend void OnButtonPress(BuzzoButton* button);
 
-        char packetBuffer[PACKET_MAX_SIZE + 1]; 
+        //char packetBuffer[PACKET_MAX_SIZE + 1]; 
 
-        WiFiUDP udp;
+        void ProcessPacketQueue();
+        void ProcessPacket(const uint8_t *mac, const char* packetBuffer);
+        
+        ReceivedPacketData packetQueue[PACKET_MAX_QUEUE];
+        unsigned int _packetQueueIndex = 0;
+        unsigned int _packetQueueCount = 0;
+        
+
+        //WiFiUDP udp;
         unsigned int _lastSendTime = 0;
-        IPAddress _controllerIp;
+        unsigned long _lastControllerContactTime = 0;
+//        IPAddress _controllerIp;
 
         BuzzoButtonState* _states[STATE_COUNT];
 

@@ -11,10 +11,10 @@ class ButtonClientInfo
 {
     public: 
         ButtonClientInfo();
-        ButtonClientInfo(IPAddress ip, std::string id);
+        ButtonClientInfo(const uint8_t *mac, std::string id);
 
-        IPAddress GetIpAddress();
-        void SetIpAddress(IPAddress newAddress);
+        void GetMacAddress(uint8_t mac[6]);
+        void SetMacAddress(const uint8_t *mac);
         
         std::string& GetId();
         void SetId(std::string id);
@@ -31,10 +31,15 @@ class ButtonClientInfo
         unsigned int GetBatteryLevel();
         void SetBatteryLevel(unsigned int level);
 
+        bool CompareMac(const uint8_t *mac);
+
     private:
-        IPAddress _ip;
+        //IPAddress _ip;
+        uint8_t _mac[6];
+        
         int _score;   
         std::string _id;
+
 
         unsigned long _lastContactMillis;
 

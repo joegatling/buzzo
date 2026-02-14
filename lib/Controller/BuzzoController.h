@@ -1,16 +1,22 @@
 #pragma once
 
 #include <string>
-#include <WiFiudp.h>
+//#include <WiFiudp.h>
+//#include <WiFi.h>
+
+
 #include <SimpleButton.h>
 
 #include "ButtonClientInfo.h"
-#include "ResponseQueue.h"
+//#include "ResponseQueue.h"
+#include <ClientResponseQueue.h>
 
-#define PACKET_MAX_SIZE 1024
+#define PACKET_MAX_SIZE 256
+#define PACKET_MAX_QUEUE 4
+
 #define MAX_CLIENTS 12
 
-#define PORT 8888
+//#define PORT 8888
 
 
 #ifdef NEW_PINS
@@ -28,6 +34,12 @@
     #define INCORRECT_BUTTON_PIN 14
     #define RESET_BUTTON_PIN 15
 #endif
+
+struct ControllerReceivedPacketData
+{
+    uint8_t mac[6];
+    char packetBuffer[PACKET_MAX_SIZE + 1];
+};
 
 class BuzzoController
 {
@@ -64,24 +76,26 @@ class BuzzoController
 
         unsigned int GetMinBatteryLevelForClients();
 
+        bool IsGoingToSleep() { return _shouldSleep; }
+
+        void EnqueuePacketData(const uint8_t *mac, const char* packetBuffer);
+
     private:
         static BuzzoController* _instance;
 
         BuzzoController();
 
-        void ProcessPacket();
+        void ProcessRegisterCommand(const uint8_t *mac, std::string paramId, std::string paramBattery);
+        void ProcessBuzzCommand(const uint8_t *mac);
 
-        void ProcessRegisterCommand(IPAddress ip, std::string paramId, std::string paramBattery);
-        void ProcessBuzzCommand(IPAddress ip);
-
-        void SendAnswerCommand(IPAddress ip, int timer, int totalTime);
-        void SendQueueCommand(IPAddress ip, int placeInQueue);
-        void SendResponseCommand(IPAddress ip, bool isCorrect);
-        void SendResetCommand(IPAddress ip, bool canBuzz);
-        void SendSelectCommand(IPAddress ip);
-        void SendErrorCommand(IPAddress ip, int errorCode);
-        void SendScoreCommand(IPAddress ip, int score);
-        void SendSleepCommand(IPAddress ip);
+        void SendAnswerCommand(const uint8_t *mac, int timer, int totalTime);
+        void SendQueueCommand(const uint8_t *mac, int placeInQueue);
+        void SendResponseCommand(const uint8_t *mac, bool isCorrect);
+        void SendResetCommand(const uint8_t *mac, bool canBuzz);
+        void SendSelectCommand(const uint8_t *mac);
+        void SendErrorCommand(const uint8_t *mac, int errorCode);
+        void SendScoreCommand(const uint8_t *mac, int score);
+        void SendSleepCommand(const uint8_t *mac);
 
         void UpdatePlaying();
         void UpdateSetup();
@@ -90,9 +104,15 @@ class BuzzoController
         
         void AddClient(ButtonClientInfo* newClient);
         void RemoveClientAt(unsigned int index);
-        ButtonClientInfo* GetClient(IPAddress ip);
+        ButtonClientInfo* GetClient(const uint8_t *mac);
         ButtonClientInfo* GetClient(std::string id);
 
+        void ProcessPacketQueue();
+        void ProcessPacket(const uint8_t *mac, const char* packetBuffer);
+        
+        ControllerReceivedPacketData packetQueue[PACKET_MAX_QUEUE];
+        unsigned int _packetQueueIndex = 0;
+        unsigned int _packetQueueCount = 0;
         
 
 
@@ -101,7 +121,7 @@ class BuzzoController
 
         char packetBuffer[PACKET_MAX_SIZE + 1]; 
 
-        WiFiUDP udp;
+        //WiFiUDP udp;
 
         unsigned long _lastSendTime = 0;
         unsigned long _responseStartTime = 0;
@@ -113,7 +133,8 @@ class BuzzoController
 
         unsigned long _autoResestTime = 0;
 
-        bool _isAcceptingResponses = true;
+        // Replace with ClientResponseQueue
+        //bool _isAcceptingResponses = true;
         bool _isReset = false;
         bool _shouldSleep = false;
         bool _isInAdjustMode = false;
@@ -126,12 +147,14 @@ class BuzzoController
         SimpleButton _resetButton;
         SimpleButton _pauseButton;
 
-        ResponseQueue<std::string> _responseQueue;
-        std::string _currentRespondant;
-        std::string _previousRespondant;
-        bool _previousRespondantWasCorrect = false;
+        //ResponseQueue<std::string> _responseQueue;
+        ClientResponseQueue _clientResponses;
+        
+        // std::string _currentRespondant;
+        // std::string _previousRespondant;
+        //bool _previousRespondantWasCorrect = false;
 
-        std::string _participants[MAX_CLIENTS];
-        unsigned int _participantCount;
+        //std::string _participants[MAX_CLIENTS];
+        //unsigned int _participantCount;
 
 };
