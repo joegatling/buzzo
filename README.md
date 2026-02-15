@@ -30,6 +30,7 @@ Each button will automatically keep track of correct answers, and display them a
 
 ## Buzzo Controller
 The controller has four buttons:
+
 `↺`/`⏻` - Power and Reset  
 `⛌` - Incorrect  
 `✓` - Correct  
@@ -44,7 +45,6 @@ The Buzzo Controller will switch of automatically afer 15 minutes if there are d
 
 ### Judging Questions
 If a Buzzo Button is answering, press the button marked `⛌` to judge the answer **incorrect**. Use `✓` to mark the answer as **correct**.
-
 If a previously judged answer needs to be changed, press and hold either `⛌` or `✓`. This will retroactively change the last response.
 
 ### Pausing the Countdown
