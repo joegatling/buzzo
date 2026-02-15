@@ -13,6 +13,7 @@ A single button requires...
 - 1x 9mm Piezeo Buzzer (https://www.amazon.com/dp/B0827DS4HH)
 - 1x 500mAh Lithium Ion Battery (https://www.adafruit.com/product/1578)
 - 1x 10mm (tall) x 12mm x 12mm tactile switch (https://www.lcsc.com/product-detail/C127505.html)
+- 7x M2x10mm screw
 - Wire
 - 3D printed parts (PLA for the main body, White TPU for the button cap)
 
@@ -25,6 +26,7 @@ A controller requires...
 - 1x 3mm LED
 - 1x Resistor, (value depending on the LED forward voltage)
 - 4x tactile sitch *See note below*
+- 4x M2x10mm screw
 - Wire
 - 3D printed parts (PLA for the main body, White TPU for the button caps)
 
