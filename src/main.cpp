@@ -4,15 +4,13 @@
 #include <Arduino.h>
 #include <WiFi.h>
 
-#include <Adafruit_NeoPixel.h>
-
-#if defined(BUZZO_BUTTON_ADAFRUIT)
+#if defined(BUZZO_BUTTON_ADAFRUIT) || defined(BUZZO_CONTROLLER_ADAFRUIT)
 #include "Adafruit_MAX1704X.h"
 
 Adafruit_MAX17048 maxlipo;
 #endif
 
-#if BUZZO_CONTROLLER
+#if defined(BUZZO_CONTROLLER_ADAFRUIT) || defined(BUZZO_CONTROLLER_ALIEXPRESS)
 
   #include <BuzzoController.h>
 
@@ -23,7 +21,7 @@ Adafruit_MAX17048 maxlipo;
   #define DISCONNECTED_SLEEP_TIMER  (4 * 60 * 1000)
   #define CONNECTED_SLEEP_TIMER     (40 * 60 * 1000)
 
-  #define LOW_POWER_PIN   27
+  #define LOW_POWER_PIN   11
 
 #else
 
@@ -65,7 +63,7 @@ float mapFloat(float x, float in_min, float in_max, float out_min, float out_max
 
 unsigned int GetBatteryLevel()
 {
-  #if defined(BUZZO_BUTTON_ADAFRUIT)
+  #if defined(BUZZO_BUTTON_ADAFRUIT) || defined(BUZZO_CONTROLLER_ADAFRUIT)
     float cellVoltage = maxlipo.cellVoltage();
     if (isnan(cellVoltage)) 
     {
@@ -100,9 +98,6 @@ unsigned int GetBatteryLevel()
 
 void Sleep()
 {
-
-    
-
     #if BUZZO_BUTTON
       BuzzoButton::GetInstance()->SetState(BuzzoButton::GO_TO_SLEEP);
       return;
@@ -114,7 +109,7 @@ void Sleep()
       WiFi.disconnect(true);
       digitalWrite(LED_PIN, LOW);
       delay(100);
-      esp_sleep_enable_ext0_wakeup(GPIO_NUM_14, LOW);
+      esp_sleep_enable_ext0_wakeup(GPIO_NUM_10, LOW);
       esp_deep_sleep_start();
     #endif
 
@@ -130,6 +125,9 @@ void Sleep()
 void setup() 
 {
   Serial.begin(115200);
+  
+  delay(200); // Give serial time to connect
+  
   Serial.println();
 
   wakeTime = millis();
@@ -138,7 +136,7 @@ void setup()
     setCpuFrequencyMhz(80);
   #endif
 
-  #if defined(BUZZO_BUTTON_ADAFRUIT)
+  #if !defined(BUZZO_BUTTON_ALIEXPRESS)
     while (!maxlipo.begin()) {
       Serial.println(F("Couldnt find Adafruit MAX17048?\nMake sure a battery is plugged in!"));
       delay(2000);
@@ -148,35 +146,21 @@ void setup()
     Serial.println(maxlipo.getChipID(), HEX);  
   #endif
 
-
   #if BUZZO_CONTROLLER
-    // Serial.print("Setting soft-AP configuration... ");
-    // Serial.println(WiFi.softAPConfig(local_IP, gateway, subnet) ? "Ready" : "Failed!");
 
-    // Serial.print("Setting soft-AP... ");
-    // Serial.println(WiFi.softAP(ssid, password, 1, 0, 9) ? "Ready" : "Failed!");
-
-    // Serial.print("Soft-AP IP address = ");
-    // Serial.println(WiFi.softAPIP());
     pinMode(LOW_POWER_PIN, ANALOG);
     analogWrite(LOW_POWER_PIN, 64);
     
     pinMode(LED_PIN, OUTPUT);
     digitalWrite(LED_PIN, HIGH);
     
-    
     BuzzoController::GetInstance()->Initialize();
+
+    Serial.println("Buzzo Controller Initialized");
+    
   #elif BUZZO_BUTTON
 
-    // Serial.print("Connecting to wifi... ");
-    // WiFi.mode(WIFI_STA);
-    // WiFi.begin(ssid, password);
-
-    // isConnected = false;
-    
     digitalWrite(LED_PIN, HIGH);
-
-    //Serial.println(WiFi.localIP());  
 
     BuzzoButton::GetInstance()->Initialize();
     BuzzoButton::GetInstance()->SetState(BuzzoButton::DISCONNECTED);
@@ -185,8 +169,6 @@ void setup()
     BuzzoButton::GetInstance()->ShowBatteryLevelOnButton();
 
   #endif
-
-
 
 }
 
@@ -240,14 +222,18 @@ void loop()
     Sleep();
   }
 
-  //Serial.println(GetBatteryLevel());
   if(millis() - lastClientReportTime > 5000)
   {
     lastClientReportTime = millis();
+    Serial.print("Controller Battery: ");
+    Serial.println(GetBatteryLevel());
     Serial.print("Clients: ");
     Serial.println(BuzzoController::GetInstance()->GetActiveClientCount());
-    Serial.print("Min Client Battery: ");
-    Serial.println(BuzzoController::GetInstance()->GetMinBatteryLevelForClients());
+    if(BuzzoController::GetInstance()->GetActiveClientCount() > 0)
+    {
+      Serial.print("Min Client Battery: ");
+      Serial.println(BuzzoController::GetInstance()->GetMinBatteryLevelForClients());
+    }
   }
 
 }
@@ -266,39 +252,7 @@ void loop()
     {
       Sleep();
     }  
-    
-    // if(WiFi.status() != WL_CONNECTED)
-    // {
-    //   if(isConnected == true)
-    //   {
-    //     Serial.println("Disconnected");
-    //     isConnected = false;
-    //     wakeTime = millis();
-    //     BuzzoButton::GetInstance()->SetState(BuzzoButton::DISCONNECTED);
-    //   }
-
-    //   if(idleTime > DISCONNECTED_SLEEP_TIMER)
-    //   {
-    //     Sleep();
-    //   }
-    // }
-    // else
-    // {
-    //   if(isConnected == false)
-    //   {
-    //     Serial.println("Reconnected");
-    //     isConnected = true;
-    //     wakeTime = millis();
-    //     WiFi.setAutoReconnect(true);
-
-    //     BuzzoButton::GetInstance()->SetState(BuzzoButton::IDLE);
-    //   }
-
-    //   if(idleTime > CONNECTED_SLEEP_TIMER)
-    //   {
-    //     Sleep();
-    //   }    
-    // }
+        
   }
   
   BuzzoButton::GetInstance()->SetBatteryLevel(GetBatteryLevel());
@@ -309,7 +263,6 @@ void loop()
     Sleep();
   }
 
-  //Serial.println(GetBatteryLevel());
 }
 
 

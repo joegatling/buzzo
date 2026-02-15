@@ -5,6 +5,7 @@
 #include <esp_wifi.h>
 #include <esp_now.h>
 #include <NeoPixelBusLg.h>
+#include <DummyNeoPixel.h>
 #include <SimpleButton.h>
 
 #include "BuzzoButtonState.h"
@@ -22,13 +23,13 @@
 #define NUM_LED 6
 
 #if defined(BUZZO_BUTTON_ALIEXPRESS)
-    #define BUZZER_BUTTON_PIN 32
+    #define BUTTON_PIN 32
     #define NEOPIXEL_PIN 14
 #elif defined(BUZZO_BUTTON_ADAFRUIT)
-    #define BUZZER_BUTTON_PIN 6
+    #define BUTTON_PIN 6
     #define NEOPIXEL_PIN 5
 #else
-    #define BUZZER_BUTTON_PIN 1
+    #define BUTTON_PIN 1
     #define NEOPIXEL_PIN 2
 #endif
 
@@ -188,6 +189,7 @@ class BuzzoButton
 
         //Adafruit_NeoPixel _strip;
         NeoPixelBusLg<NeoGrbFeature, Neo800KbpsMethod> _strip;
+        //DummyNeoPixel _strip;
 
         ToneGenerator _toneGenerator;
 
