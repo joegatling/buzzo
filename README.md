@@ -2,33 +2,56 @@
 
 Buzzo is a DIY open source set of game show buttons.
 
-# Parts Required
+# Making A Buzzo Set
+For instructions on how to build your own Buzzo can be found [here](/docs/Button_Assembly.md).
 
-## Buzzo Button 
-The Buzzo Button is the device that each player holds. A Buzzo set should have at least two buttons
+# How to Use
+Buzzo uses a wireless technology called ESP-Now. This allows them to communicate without the need for an existing WiFi network. However, only one Buzzo set can be operating in an area at a time, as all devices will try to communicate to any available controlelr that they can find.
 
-A single button requires...
-- 1x Assembled Buzzo LED ring PCB
-- 1x Adafruit ESP32-S3 Feather dev board (https://www.adafruit.com/product/5477)
-- 1x 9mm Piezeo Buzzer (https://www.amazon.com/dp/B0827DS4HH)
-- 1x 500mAh Lithium Ion Battery (https://www.adafruit.com/product/1578)
-- 1x 10mm (tall) x 12mm x 12mm tactile switch (https://www.lcsc.com/product-detail/C127505.html)
-- 7x M2x10mm screw
-- Wire
-- 3D printed parts (PLA for the main body, White TPU for the button cap)
+## Buzzo Button
+
+### Power
+- Press the button on the Buzzo to turn it on. 
+- Press and hold to turn it off.
+
+A Buzzo Button will switch off automatically if left idle for a few minutes.
+
+### Answering
+To answer a question, press the button.  This will add the button into a queue, and each button will have 30 seconds to answer before moving to the next button in the queue.
+If the timer expires, the device turns **red** and the button cannot be buzzed until the controller resets the round.
+
+When it is a particular Buzzo's turn to answer, the button will light up yellow. As the timer expires, wedges of the button will go dark. Once they are all dark, the turn is over.
+
+Buzzo devices that are in the answer queue will show a blue light. The number of bright wedges indicates device's place in the queue (eg, one bright wedge means 1st in the queue, two bright wedges means 2nd, etc...).
+
+### Scoring
+Each button will automatically keep track of correct answers, and display them as wedges on the button. Once a device has accumulated 6 correct answers, it has won.
 
 ## Buzzo Controller
-The Buzzo Controller is the device that manages everything. A working Buzzo set needs to have one of these.
+The controller has four buttons:
+`↺`/`⏻` - Power and Reset
+`⛌` - Incorrect
+`✓` - Correct
+`⃦`- Pause
 
-A controller requires...
-- 1x Adafruit ESP32-S3 Feather dev board (https://www.adafruit.com/product/5477)
-- 1x 500mAh Lithium Ion Battery (https://www.adafruit.com/product/1578)
-- 1x 3mm LED
-- 1x Resistor, (value depending on the LED forward voltage)
-- 4x tactile sitch *See note below*
-- 4x M2x10mm screw
-- Wire
-- 3D printed parts (PLA for the main body, White TPU for the button caps)
+### Power
+- Press this to turn on the device
+- If the device is already powered on, press this to reset current round. This cleares
 
-*Note*
-This project is a work in progress, and I never designed an actual PCB for the Buzzo controller. It needs to have four buttons, but this side quest you'll need to undertake.
+The Buzzo Controller will switch of automatically afer 15 minutes if there are devices connected, or after 2 minutes if nothing is connected.  
+**WARNING: The Buzzo Controller is responsible for keeping track of scores. If it powers off, all devices will reset their score.**
+
+### Judging Questions
+If a Buzzo Button is answering, press the button marked `⛌` to judge the answer **incorrect**. Use `✓` to mark the answer as **correct**.
+
+If a previously judged answer needs to be changed, press and hold either `⛌` or `✓`. This will retroactively change the last response.
+
+### Pausing the Countdown
+If for any reason the answering countdown needs to be paused (eg, if there is a dispute over a response, or an interruption to play), then hold the pause button. For as long as the button is held, the timer will be paused.
+
+### Reseting
+Press the `↺` button to reset the round. This will clear the answer queue, and reset all buttons so that they are ready for the next question.  
+After resetting a round, the `↺` button can be pressed and held in order to reset the entire game. This will reset all the scores on all buttons.
+Finally, after resetting around the `↺` button can be pressed and held once more to turn off the controller and all devices.
+
+
