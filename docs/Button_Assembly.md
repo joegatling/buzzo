@@ -44,7 +44,8 @@ The firmware is written in C++, and is crea
 5. Plug in your assembled Buzzo Button
 6. Click **->** (PlatformIO: Upload)
 
-~[Visual studio code environment](/img/VSCode_Environment.png)
-~[Visual studio code environment](/img/VSCode_Build.png)
+![Visual studio code environment](/img/VSCode_Environment.png)
+![Visual studio code environment](/img/VSCode_Build.png)
 
    
+
