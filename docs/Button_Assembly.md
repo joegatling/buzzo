@@ -79,6 +79,8 @@ This is where the instructions get murky. Since the Buzzo Controller is still an
 
 ![Buzzo Controller PCB](/img/Controller_ScrapPCB.png)
 
+You can see the scrap PCB in the assembled photo below.
+
 ## Step 3 - The Wiring
 
 - Feather `Pin 5` ↔ Reset Button (Other pin on switch to GND)
@@ -86,6 +88,8 @@ This is where the instructions get murky. Since the Buzzo Controller is still an
 - Feather `Pin 9` ↔ Correct Button (Other pin on switch to GND)
 - Feather `Pin 10` ↔ Pause Button (Other pin on switch to GND)
 - Feather `Pin 11` ↔ Resistor ↔ LED ↔ GND
+
+![Assembled Buzzo Controller](/img/Controller_Assembled.png)
 
 ## Step 4 - Upload the firmware
 The firmware is written in C++, and is crea
@@ -98,6 +102,7 @@ The firmware is written in C++, and is crea
 6. Click **->** (PlatformIO: Upload)
 
 ![Visual studio code environment](/img/VSCode_Build.png)
+
 
 
 
