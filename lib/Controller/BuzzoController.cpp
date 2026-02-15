@@ -6,6 +6,8 @@
 #include <string>
 #include <sstream>
 
+#include "driver/rtc_io.h"
+
 
 #include "BuzzoController.h"
 #include "CommandsController.h"
@@ -15,6 +17,7 @@
 #define TIME_BEFORE_FIRST_RESPONSE (250)
 #define RESPONDANT_PING_TIME    500
 #define AUTO_RESET_TIME         10000
+#define MIN_TIME_TO_END_TURN    750
 
 #define MAX_SCORE 6
 
@@ -34,7 +37,7 @@ void OnControllerDataSent(const uint8_t *mac_addr, esp_now_send_status_t status)
     // Serial.println(status == ESP_NOW_SEND_SUCCESS ? "Delivery Success" : "Delivery Fail");
 }
 
-void OnControllerDataReceived(const esp_now_recv_info_t *info, const uint8_t *data, int len) 
+void OnControllerDataReceived(const uint8_t *mac, const uint8_t *data, int len) 
 {
     len = min(len, PACKET_MAX_SIZE);
 
@@ -42,7 +45,7 @@ void OnControllerDataReceived(const esp_now_recv_info_t *info, const uint8_t *da
     memcpy(packetBuffer, data, len);
     packetBuffer[len] = 0;
 
-    BuzzoController::GetInstance()->EnqueuePacketData(info->src_addr, packetBuffer);
+    BuzzoController::GetInstance()->EnqueuePacketData(mac, packetBuffer);
 
     // Serial.print("Last Packet Recv Data: ");
     // for(int i = 0; i < len; i++)
@@ -914,6 +917,13 @@ void BuzzoController::EndCurrentRespondantTurn(bool isCorrect)
 {
     _lastButtonPressTime = millis();
 
+    if(_nextResponderDelayStartTime != 0)
+    {
+        return; // Cannot end at turn in the momeents between respondants
+    }
+
+
+
     if(_currentState == BuzzoController::PLAYING && _clientResponses.IsRoundOver() == false)
     {
         Serial.print("Ending Turn - ");
@@ -924,6 +934,15 @@ void BuzzoController::EndCurrentRespondantTurn(bool isCorrect)
             Serial.println("There is no current respondant");
             return;
         }
+
+        unsigned long millisResponding = millis() - _responseStartTime - _responsePauseTime;
+        if(millisResponding < MIN_TIME_TO_END_TURN)
+        {
+            Serial.print("Not enough time has passed to end the turn: ");
+            Serial.println(millisResponding);
+            return; // Not enough time has passed to end the turn
+        }
+
 
         auto client = GetClient(_clientResponses.GetCurrentRespondant());
 
@@ -1026,7 +1045,7 @@ void BuzzoController::HoldResetButton()
         if(_isReset)
         {
             _shouldSleep = true;
-            digitalWrite(13, LOW);
+            //digitalWrite(13, LOW);
 
             for(int i = 0; i < _clientCount; i++)
             {
@@ -1069,9 +1088,14 @@ void BuzzoController::ReleaseHoldResetButton()
     {
         WiFi.disconnect(true);
 
-        // esp_sleep_enable_ext0_wakeup(GPIO_NUM_32, LOW);
-        // esp_sleep_enable_ext0_wakeup(GPIO_NUM_15, LOW);    
-        esp_sleep_enable_ext0_wakeup(GPIO_NUM_14, LOW);
+        delay(200);
+
+        rtc_gpio_init(RESET_BUTTON_PIN);
+        rtc_gpio_set_direction(RESET_BUTTON_PIN, RTC_GPIO_MODE_INPUT_ONLY);
+        rtc_gpio_pullup_en(RESET_BUTTON_PIN);
+        rtc_gpio_pulldown_dis(RESET_BUTTON_PIN);        
+
+        esp_sleep_enable_ext0_wakeup(RESET_BUTTON_PIN, LOW);
 
         esp_deep_sleep_start();  
     } 

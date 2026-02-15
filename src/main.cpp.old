@@ -1,0 +1,90 @@
+#include <Arduino.h>
+#include <WiFi.h>
+
+#if BUZZO_CONTROLLER
+
+  #include <BuzzoController.h>
+
+  IPAddress local_IP(192,168,1,1);
+  IPAddress gateway(192,168,1,1);
+  IPAddress subnet(255,255,255,0);  
+
+  #define DISCONNECTED_SLEEP_TIMER  (4 * 60 * 1000)
+  #define CONNECTED_SLEEP_TIMER     (40 * 60 * 1000)
+
+  #define LOW_POWER_PIN   27
+
+#else
+
+  #if defined(BUZZO_BUTTON_ADAFRUIT)
+
+    #include "Adafruit_MAX1704X.h"
+    Adafruit_MAX17048 maxlipo;
+
+  #endif
+
+  #include <BuzzoButton.h>
+
+  #define DISCONNECTED_SLEEP_TIMER  (2 * 60 * 1000)
+  #define CONNECTED_SLEEP_TIMER     (15 * 60 * 1000)
+
+#endif
+
+#define LED_PIN 13
+
+#define RANGE_START 39
+#define RANGE_END 40
+
+#define BATTERY_MAX 4.2f
+#define BATTERY_MIN 3.3f
+
+unsigned long wakeTime = 0;
+
+unsigned long batteryReportInterval = 0;
+unsigned long lastClientReportTime = 0;
+
+float mapFloat(float x, float in_min, float in_max, float out_min, float out_max) 
+{
+  if(in_max == in_min)
+  {
+    return out_min;
+  }
+  return (x - in_min) * (out_max - out_min) / (in_max - in_min) + out_min;
+}
+
+void Sleep()
+{
+    #if BUZZO_BUTTON
+      //Serial.println("Going to sleep");
+      BuzzoButton::GetInstance()->SetState(BuzzoButton::GO_TO_SLEEP);
+      return;
+    #else
+      BuzzoController::GetInstance()->SetAllClientsToSleep();
+
+      delay(50);
+
+      WiFi.disconnect(true);
+      digitalWrite(LED_PIN, LOW);
+      delay(100);
+      esp_sleep_enable_ext0_wakeup(GPIO_NUM_14, LOW);
+      esp_deep_sleep_start();
+    #endif
+}
+
+void setup() 
+{
+  Serial.begin(115200);
+  Serial.println("Minimal test");
+
+  #if defined(ESP32)  
+    setCpuFrequencyMhz(80);
+  #endif
+
+  digitalWrite(LED_PIN, HIGH);
+}
+
+void loop() 
+{
+  Serial.println("Minimal test");
+  delay(1000);
+}
