@@ -30,10 +30,10 @@ Each button will automatically keep track of correct answers, and display them a
 
 ## Buzzo Controller
 The controller has four buttons:
-`↺`/`⏻` - Power and Reset
-`⛌` - Incorrect
-`✓` - Correct
-`⃦`- Pause
+`↺`/`⏻` - Power and Reset  
+`⛌` - Incorrect  
+`✓` - Correct  
+`⃦`- Pause  
 
 ### Power
 - Press this to turn on the device
