@@ -2,6 +2,8 @@
 
 Here's a basic guide for building a Buzzo. 
 
+## Making the Buzzo Button
+
 ## Step 1 - Gather the parts
 A single Buzzo requires...
 
@@ -34,6 +36,16 @@ The wiring is quite simple. Connect everything up as follows:
 
 ![Example completed Buzzo wiring](/img/Buzzo_Wiring.png)
 
+All the wiring can be done before assembling the 3D printed parts. Below is what a partially assembled device looks like. 
+
+Some tips:
+- Feed the assembled wiring in through the top by sliding the Feather through the hole.
+- Note that the LED PCB sits on top of the printed collar piece.
+- A small blob of hot glue can be used to hold the piezo speaker in place.
+
+![Buzzo button top](/img/Buzzo_AssembledTop.png)
+![Buzzo button top](/img/Buzzo_AssembledBottom.png)
+
 # Step 5 - Upload the firmware
 The firmware is written in C++, and is crea
 
@@ -47,5 +59,7 @@ The firmware is written in C++, and is crea
 ![Visual studio code environment](/img/VSCode_Environment.png)
 ![Visual studio code environment](/img/VSCode_Build.png)
 
+# Step 6 - 
    
+
 
