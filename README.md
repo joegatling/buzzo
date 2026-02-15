@@ -1,5 +1,6 @@
 # Buzzo
 
+![Buzzo Hero Image](/img/Buzzo.png)
 Buzzo is a DIY open source set of game show buttons.
 
 # Making A Buzzo Set
