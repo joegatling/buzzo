@@ -7,6 +7,8 @@ Buzzo is a DIY open source set of game show buttons.
 For instructions on how to build your own Buzzo can be found [here](/docs/Button_Assembly.md).
 
 # How to Use
+Buzzo is a set of buttons for running a fast paced answering game. Each contestant can hit their button to "buzz in". The system will queue up buttons in the order in which they buzzed. Each button is then given 30 seconds to provide an answer. With a set of Buzzo buttons, a standard game of _Trivial Pursuit_ can be turned into an exciting gameshow. 
+
 Buzzo uses a wireless technology called ESP-Now. This allows them to communicate without the need for an existing WiFi network. However, only one Buzzo set can be operating in an area at a time, as all devices will try to communicate to any available controlelr that they can find.
 
 ## Buzzo Button
