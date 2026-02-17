@@ -1,11 +1,14 @@
 # Buzzo
 
+![Buzzo Hero Image](/img/Buzzo.png)
 Buzzo is a DIY open source set of game show buttons.
 
 # Making A Buzzo Set
 For instructions on how to build your own Buzzo can be found [here](/docs/Button_Assembly.md).
 
 # How to Use
+Buzzo is a set of buttons for running a fast paced answering game. Each contestant can hit their button to "buzz in". The system will queue up buttons in the order in which they buzzed. Each button is then given 30 seconds to provide an answer. With a set of Buzzo buttons, a standard game of _Trivial Pursuit_ can be turned into an exciting gameshow. 
+
 Buzzo uses a wireless technology called ESP-Now. This allows them to communicate without the need for an existing WiFi network. However, only one Buzzo set can be operating in an area at a time, as all devices will try to communicate to any available controlelr that they can find.
 
 ## Buzzo Button
@@ -29,10 +32,11 @@ Each button will automatically keep track of correct answers, and display them a
 
 ## Buzzo Controller
 The controller has four buttons:
-`↺`/`⏻` - Power and Reset
-`⛌` - Incorrect
-`✓` - Correct
-`⃦`- Pause
+
+`↺`/`⏻` - Power and Reset  
+`⛌` - Incorrect  
+`✓` - Correct  
+`⃦`- Pause  
 
 ### Power
 - Press this to turn on the device
@@ -43,7 +47,6 @@ The Buzzo Controller will switch of automatically afer 15 minutes if there are d
 
 ### Judging Questions
 If a Buzzo Button is answering, press the button marked `⛌` to judge the answer **incorrect**. Use `✓` to mark the answer as **correct**.
-
 If a previously judged answer needs to be changed, press and hold either `⛌` or `✓`. This will retroactively change the last response.
 
 ### Pausing the Countdown
